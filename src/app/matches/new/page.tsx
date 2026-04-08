@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
+import { toJapaneseError } from '@/lib/utils/errors'
 import type { Player } from '@/types'
 
 function NewMatchForm() {
@@ -93,7 +94,7 @@ function NewMatchForm() {
       .select()
       .single()
 
-    if (error) { toast.error(error.message); setLoading(false); return }
+    if (error) { toast.error(toJapaneseError(error.message)); setLoading(false); return }
 
     // 最初のセットを作成
     await supabase.from('match_sets').insert({

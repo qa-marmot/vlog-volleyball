@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { generateInviteCode } from '@/lib/utils/rotation'
+import { toJapaneseError } from '@/lib/utils/errors'
 
 export default function NewTeamPage() {
   const router = useRouter()
@@ -31,7 +32,7 @@ export default function NewTeamPage() {
       .select()
       .single()
 
-    if (error) { toast.error(error.message); setLoading(false); return }
+    if (error) { toast.error(toJapaneseError(error.message)); setLoading(false); return }
 
     await supabase.from('team_members').insert({
       team_id: team.id,

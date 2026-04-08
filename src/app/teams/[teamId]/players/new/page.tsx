@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
+import { toJapaneseError } from '@/lib/utils/errors'
 import type { PlayerPosition } from '@/types'
 
 const POSITIONS: { value: PlayerPosition; label: string }[] = [
@@ -49,7 +50,7 @@ export default function NewPlayerPage() {
       is_libero: isLibero,
     })
     setLoading(false)
-    if (error) { toast.error(error.message); return }
+    if (error) { toast.error(toJapaneseError(error.message)); return }
     toast.success('選手を追加しました')
     router.push(`/teams/${teamId}`)
   }

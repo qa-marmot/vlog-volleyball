@@ -14,6 +14,7 @@ import { UndoButton } from '@/components/match/UndoButton'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
+import { toJapaneseError } from '@/lib/utils/errors'
 import type { Player, PointDetail } from '@/types'
 
 export default function RecordPage() {
@@ -175,8 +176,8 @@ export default function RecordPage() {
       store.markSynced()
       toast.success('保存しました')
     } catch (err) {
-      toast.error('保存に失敗しました')
-      console.error(err)
+      const msg = err instanceof Error ? toJapaneseError(err.message) : '保存に失敗しました'
+      toast.error(msg)
     } finally {
       setSyncing(false)
     }
