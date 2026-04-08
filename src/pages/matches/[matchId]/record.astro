@@ -35,13 +35,18 @@ const playersForClient: Player[] = teamPlayers.map((p) => ({
 }))
 ---
 <Base title="試合記録">
-  <div class="min-h-screen bg-gray-50">
-    <header class="bg-white border-b px-4 py-3 flex items-center justify-between sticky top-0">
-      <div class="flex items-center gap-3">
-        <a href="/dashboard" class="text-gray-500 hover:text-gray-700 text-sm">←</a>
-        <span class="font-semibold text-sm">{team?.name} vs {match.opponentName}</span>
+  <div class="min-h-screen" style="background: #f0f4ff">
+    <header class="vball-header sticky top-0 z-10 px-4 py-3">
+      <div class="max-w-lg mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <a href="/dashboard" class="text-blue-200 hover:text-white text-sm transition-colors">←</a>
+          <div>
+            <div class="font-bold text-white text-sm">{team?.name} <span class="text-blue-300">vs</span> {match.opponentName}</div>
+            <div class="text-blue-300 text-xs">{match.matchDate} · 記録中</div>
+          </div>
+        </div>
+        <div class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
       </div>
-      <span class="text-xs text-gray-400">{match.matchDate}</span>
     </header>
 
     <main class="max-w-lg mx-auto p-4">

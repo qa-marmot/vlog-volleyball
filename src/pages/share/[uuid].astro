@@ -63,10 +63,15 @@ stats.scoreTimeline = computeTimelineWithSets(
 )
 ---
 <Base title={`${team?.name ?? ''} vs ${match.opponentName} 試合結果`}>
-  <div class="min-h-screen bg-gray-50">
-    <header class="bg-white border-b px-4 py-3 flex items-center justify-between sticky top-0">
-      <span class="text-xl font-bold text-blue-600">V-Log</span>
-      <span class="text-xs text-gray-400">試合結果（公開）</span>
+  <div class="min-h-screen" style="background: #f0f4ff">
+    <header class="vball-header sticky top-0 z-10 px-4 py-3">
+      <div class="max-w-2xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🏐</span>
+          <span class="text-xl font-black text-white tracking-tight">V-Log</span>
+        </div>
+        <span class="text-xs text-blue-200 font-medium">試合結果（公開）</span>
+      </div>
     </header>
 
     <main class="max-w-2xl mx-auto p-4">

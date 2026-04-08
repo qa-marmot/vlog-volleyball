@@ -68,17 +68,24 @@ stats.scoreTimeline = computeTimelineWithSets(
 )
 ---
 <Base title="試合結果">
-  <div class="min-h-screen bg-gray-50">
-    <header class="bg-white border-b px-4 py-3 flex items-center justify-between sticky top-0">
-      <div class="flex items-center gap-3">
-        <a href="/dashboard" class="text-gray-500 hover:text-gray-700 text-sm">←</a>
-        <span class="font-semibold text-sm">{team?.name} vs {match.opponentName}</span>
+  <div class="min-h-screen" style="background: #f0f4ff">
+    <header class="vball-header sticky top-0 z-10 px-4 py-3">
+      <div class="max-w-2xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <a href="/dashboard" class="text-blue-200 hover:text-white text-sm transition-colors">←</a>
+          <div>
+            <div class="font-bold text-white text-sm">{team?.name} <span class="text-blue-300">vs</span> {match.opponentName}</div>
+            <div class="text-blue-300 text-xs">{match.matchDate} · 試合結果</div>
+          </div>
+        </div>
+        {match.status === 'in_progress' && (
+          <a href={`/matches/${matchId}/record`}
+            class="text-xs font-bold rounded-xl px-3 py-1.5 transition-colors"
+            style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3)">
+            記録に戻る
+          </a>
+        )}
       </div>
-      {match.status === 'in_progress' && (
-        <a href={`/matches/${matchId}/record`} class="text-xs bg-green-100 text-green-700 rounded px-2 py-1 hover:bg-green-200">
-          記録に戻る
-        </a>
-      )}
     </header>
 
     <main class="max-w-2xl mx-auto p-4">

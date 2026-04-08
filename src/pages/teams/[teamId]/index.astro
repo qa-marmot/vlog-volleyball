@@ -28,50 +28,83 @@ const positionLabel: Record<string, string> = {
   S: 'セッター', OH: 'アウトサイドヒッター', MB: 'ミドルブロッカー',
   OP: 'オポジット', L: 'リベロ',
 }
+const positionColor: Record<string, string> = {
+  S: 'background:#dbeafe;color:#1d4ed8',
+  OH: 'background:#dcfce7;color:#15803d',
+  MB: 'background:#fef3c7;color:#b45309',
+  OP: 'background:#fce7f3;color:#be185d',
+  L: 'background:#fef9c3;color:#854d0e',
+}
 ---
 <Base title={team.name}>
-  <div class="min-h-screen bg-gray-50">
-    <header class="bg-white border-b px-4 py-3 flex items-center justify-between sticky top-0">
-      <div class="flex items-center gap-3">
-        <a href="/dashboard" class="text-gray-500 hover:text-gray-700 text-sm">←</a>
-        <span class="font-semibold">{team.name}</span>
+  <div class="min-h-screen" style="background: #f0f4ff">
+    <!-- Header -->
+    <header class="vball-header sticky top-0 z-10 px-4 py-3">
+      <div class="max-w-2xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <a href="/dashboard" class="text-blue-200 hover:text-white text-sm transition-colors">←</a>
+          <div class="flex items-center gap-2">
+            <span class="text-lg">🏐</span>
+            <span class="font-black text-white text-lg">{team.name}</span>
+          </div>
+        </div>
+        <div class="font-mono text-xs font-bold tracking-widest rounded-lg px-2.5 py-1.5"
+             style="background: rgba(255,255,255,0.15); color: #93c5fd">
+          {team.inviteCode}
+        </div>
       </div>
-      <span class="font-mono text-xs text-gray-400 bg-gray-100 rounded px-2 py-1">{team.inviteCode}</span>
     </header>
 
     <main class="max-w-2xl mx-auto p-4 space-y-6">
       <!-- 選手一覧 -->
       <section>
         <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold">選手一覧</h2>
+          <h2 class="font-bold text-gray-800 flex items-center gap-2">
+            <span class="inline-block w-1 h-5 rounded-full" style="background: #1a56db"></span>
+            選手一覧
+            <span class="text-xs font-normal text-gray-400 ml-1">{teamPlayers.length}名</span>
+          </h2>
           {isOwner && (
-            <a href={`/teams/${teamId}/players/new`} class="text-sm bg-blue-600 text-white rounded-lg px-3 py-1.5 hover:bg-blue-700">
+            <a href={`/teams/${teamId}/players/new`}
+              class="text-sm text-white rounded-xl px-3 py-1.5 font-bold transition-opacity hover:opacity-90"
+              style="background: linear-gradient(135deg, #1a56db, #0f2044)">
               + 選手を追加
             </a>
           )}
         </div>
+
         {teamPlayers.length > 0 ? (
           <div class="space-y-2">
             {teamPlayers.map((p) => (
-              <div class="flex items-center justify-between bg-white rounded-xl border px-4 py-3">
+              <div class="flex items-center justify-between bg-white rounded-2xl border border-gray-100 px-4 py-3"
+                   style="box-shadow: 0 1px 3px rgba(0,0,0,0.06)">
                 <div class="flex items-center gap-3">
-                  <span class="font-mono text-lg font-bold text-gray-300 w-8 text-right">#{p.number}</span>
+                  <div class="w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm score-number"
+                       style="background: linear-gradient(135deg, #0f2044, #1a56db); color: #93c5fd">
+                    #{p.number}
+                  </div>
                   <div>
-                    <div class="font-medium text-sm">{p.name}</div>
+                    <div class="font-semibold text-sm text-gray-800">{p.name}</div>
                     {p.position && (
-                      <div class="text-xs text-gray-400">{positionLabel[p.position] ?? p.position}</div>
+                      <span class="text-xs rounded-full px-2 py-0.5 font-medium"
+                            style={positionColor[p.position] ?? 'background:#f3f4f6;color:#6b7280'}>
+                        {positionLabel[p.position] ?? p.position}
+                      </span>
                     )}
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
                   {p.isLibero && (
-                    <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">リベロ</span>
+                    <span class="text-xs rounded-full px-2.5 py-1 font-bold"
+                          style="background: linear-gradient(135deg, #fbbf24, #f97316); color: white">
+                      リベロ
+                    </span>
                   )}
                   {isOwner && (
                     <button
                       data-player-id={p.id}
                       data-player-name={p.name}
-                      class="delete-player-btn text-xs text-red-400 hover:text-red-600 px-2 py-1"
+                      class="delete-player-btn text-xs text-gray-300 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
                     >
                       削除
                     </button>
@@ -81,8 +114,10 @@ const positionLabel: Record<string, string> = {
             ))}
           </div>
         ) : (
-          <div class="bg-white rounded-xl border px-4 py-6 text-center text-sm text-gray-500">
-            選手が登録されていません。
+          <div class="bg-white rounded-2xl border border-gray-100 px-4 py-8 text-center"
+               style="box-shadow: 0 1px 3px rgba(0,0,0,0.06)">
+            <div class="text-3xl mb-2">👤</div>
+            <div class="text-sm font-medium text-gray-500">選手が登録されていません</div>
           </div>
         )}
       </section>
@@ -90,65 +125,91 @@ const positionLabel: Record<string, string> = {
       <!-- 試合履歴 -->
       <section>
         <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold">試合履歴</h2>
-          <a href={`/matches/new?teamId=${teamId}`} class="text-sm bg-blue-600 text-white rounded-lg px-3 py-1.5 hover:bg-blue-700">
+          <h2 class="font-bold text-gray-800 flex items-center gap-2">
+            <span class="inline-block w-1 h-5 rounded-full" style="background: #f97316"></span>
+            試合履歴
+          </h2>
+          <a href={`/matches/new?teamId=${teamId}`}
+            class="text-sm text-white rounded-xl px-3 py-1.5 font-bold transition-opacity hover:opacity-90"
+            style="background: linear-gradient(135deg, #f97316, #ea580c)">
             + 試合を記録
           </a>
         </div>
+
         {recentMatches.length > 0 ? (
           <div class="space-y-2">
             {recentMatches.map((match) => (
-              <div class="flex items-center justify-between bg-white rounded-xl border px-4 py-3">
+              <div class="flex items-center justify-between bg-white rounded-2xl border border-gray-100 px-4 py-3.5"
+                   style="box-shadow: 0 1px 3px rgba(0,0,0,0.06)">
                 <div>
-                  <div class="font-medium text-sm">{team.name} vs {match.opponentName}</div>
-                  <div class="text-xs text-gray-400">{match.matchDate}{match.location ? `・${match.location}` : ''}</div>
+                  <div class="font-semibold text-sm text-gray-800">
+                    {team.name} <span class="text-gray-400 font-normal">vs</span> {match.opponentName}
+                  </div>
+                  <div class="text-xs text-gray-400 mt-0.5">
+                    {match.matchDate}{match.location ? ` · ${match.location}` : ''}
+                  </div>
                 </div>
                 <div class="flex items-center gap-2">
-                  <span class={`text-xs px-2 py-0.5 rounded-full ${match.status === 'completed' ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700'}`}>
+                  <span class={`text-xs px-2.5 py-1 rounded-full font-medium ${match.status === 'completed' ? 'bg-gray-100 text-gray-500' : 'bg-green-50 text-green-700'}`}>
                     {match.status === 'completed' ? '終了' : '進行中'}
                   </span>
                   <div class="flex gap-1">
                     {match.status === 'in_progress' && (
-                      <a href={`/matches/${match.id}/record`} class="text-xs border rounded px-2 py-1 hover:bg-gray-50">記録</a>
+                      <a href={`/matches/${match.id}/record`}
+                        class="text-xs border border-orange-200 text-orange-600 rounded-lg px-2.5 py-1 hover:bg-orange-50 font-medium">記録</a>
                     )}
-                    <a href={`/matches/${match.id}/result`} class="text-xs text-gray-500 hover:text-gray-700 px-2 py-1">結果</a>
+                    <a href={`/matches/${match.id}/result`}
+                      class="text-xs text-gray-400 hover:text-gray-600 px-2.5 py-1 rounded-lg hover:bg-gray-50">結果</a>
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div class="bg-white rounded-xl border px-4 py-6 text-center text-sm text-gray-500">
-            試合履歴がありません。
+          <div class="bg-white rounded-2xl border border-gray-100 px-4 py-8 text-center"
+               style="box-shadow: 0 1px 3px rgba(0,0,0,0.06)">
+            <div class="text-3xl mb-2">📋</div>
+            <div class="text-sm font-medium text-gray-500">試合履歴がありません</div>
           </div>
         )}
       </section>
 
       <!-- 招待コード -->
-      <section class="bg-white rounded-xl border p-4">
-        <div class="text-sm font-medium mb-1">招待コード</div>
-        <div class="flex items-center gap-3">
-          <span class="font-mono text-2xl font-bold tracking-widest text-blue-600">{team.inviteCode}</span>
-          <button id="copy-code-btn" class="text-xs border rounded px-3 py-1.5 hover:bg-gray-50">コピー</button>
+      <section class="bg-white rounded-2xl border border-gray-100 p-5"
+               style="box-shadow: 0 4px 12px rgba(0,0,0,0.08)">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-lg">🔑</span>
+          <span class="font-bold text-gray-800">招待コード</span>
         </div>
-        <p class="text-xs text-gray-400 mt-1">このコードをチームメンバーに共有してください</p>
+        <div class="rounded-xl p-4 text-center mb-3"
+             style="background: linear-gradient(135deg, #0f2044, #1a56db)">
+          <div class="font-mono text-3xl font-black text-white tracking-widest score-number"
+               style="letter-spacing: 0.3em">{team.inviteCode}</div>
+        </div>
+        <button id="copy-code-btn"
+          class="w-full text-sm border border-gray-200 rounded-xl py-2.5 font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+          コードをコピー
+        </button>
+        <p class="text-xs text-gray-400 mt-2 text-center">このコードをチームメンバーに共有してください</p>
       </section>
     </main>
   </div>
 </Base>
 
 <script define:vars={{ teamId, inviteCode: team.inviteCode }}>
-  // Copy invite code
   document.getElementById('copy-code-btn')?.addEventListener('click', async () => {
     await navigator.clipboard.writeText(inviteCode)
     const btn = document.getElementById('copy-code-btn')
     if (btn) {
-      btn.textContent = 'コピー済み'
-      setTimeout(() => { btn.textContent = 'コピー' }, 2000)
+      btn.textContent = '✓ コピー済み'
+      btn.style.color = '#16a34a'
+      setTimeout(() => {
+        btn.textContent = 'コードをコピー'
+        btn.style.color = ''
+      }, 2000)
     }
   })
 
-  // Delete player
   document.querySelectorAll('.delete-player-btn').forEach((btn) => {
     btn.addEventListener('click', async (e) => {
       const playerId = (e.currentTarget as HTMLElement).dataset.playerId
