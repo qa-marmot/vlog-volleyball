@@ -1,0 +1,69 @@
+---
+import Base from '../layouts/Base.astro'
+---
+<Base title="ログイン">
+  <div class="min-h-screen flex items-center justify-center p-4 bg-gray-50">
+    <div class="w-full max-w-sm bg-white rounded-2xl shadow-sm border p-6 space-y-6">
+      <div class="text-center">
+        <div class="text-3xl font-bold text-blue-600 mb-1">V-Log</div>
+        <h1 class="text-lg font-semibold">ログイン</h1>
+        <p class="text-sm text-gray-500">チームのアカウントでサインイン</p>
+      </div>
+
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1" for="email">メールアドレス</label>
+          <input id="email" name="email" type="email" required autocomplete="email"
+            class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="example@email.com" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1" for="password">パスワード</label>
+          <input id="password" name="password" type="password" required autocomplete="current-password"
+            class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="••••••••" />
+        </div>
+        <p id="error-msg" class="text-red-500 text-sm hidden"></p>
+        <button type="submit"
+          class="w-full bg-blue-600 text-white rounded-lg py-2.5 font-medium text-sm hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50">
+          ログイン
+        </button>
+      </form>
+
+      <p class="text-center text-sm text-gray-500">
+        アカウントをお持ちでない方は
+        <a href="/register" class="text-blue-600 underline">新規登録</a>
+      </p>
+    </div>
+  </div>
+</Base>
+
+<script>
+  const form = document.getElementById('login-form') as HTMLFormElement
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement
+  const btn = form.querySelector('button[type="submit"]') as HTMLButtonElement
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    btn.disabled = true
+    btn.textContent = 'ログイン中...'
+    errorMsg.classList.add('hidden')
+
+    const fd = new FormData(form)
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') }),
+    })
+
+    if (res.ok) {
+      location.href = '/dashboard'
+    } else {
+      const data = await res.json()
+      errorMsg.textContent = data.error ?? 'エラーが発生しました'
+      errorMsg.classList.remove('hidden')
+      btn.disabled = false
+      btn.textContent = 'ログイン'
+    }
+  })
+</script>

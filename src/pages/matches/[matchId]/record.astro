@@ -1,0 +1,60 @@
+---
+import Base from '../../../layouts/Base.astro'
+import { MatchRecorder } from '../../../components/match/MatchRecorder'
+import { getDb } from '../../../lib/db'
+import { matches, teamMembers, players, teams } from '../../../schema'
+import { eq, and } from 'drizzle-orm'
+import type { Player } from '../../../types'
+
+const user = Astro.locals.user!
+const env = Astro.locals.runtime.env
+const db = getDb(env.DB)
+const { matchId } = Astro.params as { matchId: string }
+
+const match = await db.select().from(matches).where(eq(matches.id, matchId)).get()
+if (!match) return Astro.redirect('/dashboard')
+
+const membership = await db.select().from(teamMembers)
+  .where(and(eq(teamMembers.teamId, match.teamId), eq(teamMembers.userId, user.id))).get()
+if (!membership) return Astro.redirect('/dashboard')
+
+if (match.status === 'completed') return Astro.redirect(`/matches/${matchId}/result`)
+
+const team = await db.select().from(teams).where(eq(teams.id, match.teamId)).get()
+const teamPlayers = await db.select().from(players).where(eq(players.teamId, match.teamId))
+
+// Map Drizzle camelCase to snake_case for React components
+const playersForClient: Player[] = teamPlayers.map((p) => ({
+  id: p.id,
+  team_id: p.teamId,
+  name: p.name,
+  number: p.number,
+  position: p.position as Player['position'],
+  is_libero: p.isLibero,
+  created_at: p.createdAt,
+}))
+---
+<Base title="試合記録">
+  <div class="min-h-screen bg-gray-50">
+    <header class="bg-white border-b px-4 py-3 flex items-center justify-between sticky top-0">
+      <div class="flex items-center gap-3">
+        <a href="/dashboard" class="text-gray-500 hover:text-gray-700 text-sm">←</a>
+        <span class="font-semibold text-sm">{team?.name} vs {match.opponentName}</span>
+      </div>
+      <span class="text-xs text-gray-400">{match.matchDate}</span>
+    </header>
+
+    <main class="max-w-lg mx-auto p-4">
+      <MatchRecorder
+        client:load
+        matchId={matchId}
+        teamId={match.teamId}
+        teamName={team?.name ?? '自チーム'}
+        opponentName={match.opponentName}
+        matchDate={match.matchDate}
+        shareUuid={match.shareUuid}
+        players={playersForClient}
+      />
+    </main>
+  </div>
+</Base>

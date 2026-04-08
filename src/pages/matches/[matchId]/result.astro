@@ -1,0 +1,98 @@
+---
+import Base from '../../../layouts/Base.astro'
+import { ResultWithToaster } from '../../../components/result/ResultWithToaster'
+import { getDb } from '../../../lib/db'
+import { matches, matchSets, points, players, teamMembers, teams } from '../../../schema'
+import { eq, and } from 'drizzle-orm'
+import { computeStats, computeTimelineWithSets } from '../../../lib/utils/stats'
+import type { Player, MatchSet, Point } from '../../../types'
+
+const user = Astro.locals.user!
+const env = Astro.locals.runtime.env
+const db = getDb(env.DB)
+const { matchId } = Astro.params as { matchId: string }
+
+const match = await db.select().from(matches).where(eq(matches.id, matchId)).get()
+if (!match) return Astro.redirect('/dashboard')
+
+const membership = await db.select().from(teamMembers)
+  .where(and(eq(teamMembers.teamId, match.teamId), eq(teamMembers.userId, user.id))).get()
+if (!membership) return Astro.redirect('/dashboard')
+
+const team = await db.select().from(teams).where(eq(teams.id, match.teamId)).get()
+const dbSets = await db.select().from(matchSets).where(eq(matchSets.matchId, matchId))
+const dbPoints = await db.select().from(points).where(eq(points.matchId, matchId))
+const dbPlayers = await db.select().from(players).where(eq(players.teamId, match.teamId))
+
+// Map to snake_case for React components and utils
+const setsForClient: MatchSet[] = dbSets.map((s) => ({
+  id: s.id,
+  match_id: s.matchId,
+  set_number: s.setNumber,
+  home_score: s.homeScore,
+  away_score: s.awayScore,
+  winner: s.winner as MatchSet['winner'],
+  completed: s.completed,
+  created_at: s.createdAt,
+}))
+
+const pointsForUtils: Point[] = dbPoints.map((p) => ({
+  id: p.id,
+  match_id: p.matchId,
+  set_id: p.setId,
+  point_number: p.pointNumber,
+  scorer: p.scorer as Point['scorer'],
+  home_score: p.homeScore,
+  away_score: p.awayScore,
+  rotation_index: p.rotationIndex,
+  action_type: p.actionType as Point['action_type'],
+  player_id: p.playerId,
+  is_detail_logged: p.isDetailLogged,
+  created_at: p.createdAt,
+}))
+
+const playersForClient: Player[] = dbPlayers.map((p) => ({
+  id: p.id,
+  team_id: p.teamId,
+  name: p.name,
+  number: p.number,
+  position: p.position as Player['position'],
+  is_libero: p.isLibero,
+  created_at: p.createdAt,
+}))
+
+const stats = computeStats(pointsForUtils, playersForClient, match.detailLogStartPoint)
+stats.scoreTimeline = computeTimelineWithSets(
+  pointsForUtils,
+  dbSets.map((s) => ({ id: s.id, set_number: s.setNumber }))
+)
+---
+<Base title="試合結果">
+  <div class="min-h-screen bg-gray-50">
+    <header class="bg-white border-b px-4 py-3 flex items-center justify-between sticky top-0">
+      <div class="flex items-center gap-3">
+        <a href="/dashboard" class="text-gray-500 hover:text-gray-700 text-sm">←</a>
+        <span class="font-semibold text-sm">{team?.name} vs {match.opponentName}</span>
+      </div>
+      {match.status === 'in_progress' && (
+        <a href={`/matches/${matchId}/record`} class="text-xs bg-green-100 text-green-700 rounded px-2 py-1 hover:bg-green-200">
+          記録に戻る
+        </a>
+      )}
+    </header>
+
+    <main class="max-w-2xl mx-auto p-4">
+      <ResultWithToaster
+        client:load
+        teamName={team?.name ?? '自チーム'}
+        opponentName={match.opponentName}
+        matchDate={match.matchDate}
+        location={match.location}
+        sets={setsForClient}
+        stats={stats}
+        shareUuid={match.shareUuid}
+        showSharePanel={true}
+      />
+    </main>
+  </div>
+</Base>

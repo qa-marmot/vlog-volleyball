@@ -1,0 +1,86 @@
+---
+import Base from '../../layouts/Base.astro'
+import { ResultWithToaster } from '../../components/result/ResultWithToaster'
+import { getDb } from '../../lib/db'
+import { matches, matchSets, points, players, teams } from '../../schema'
+import { eq } from 'drizzle-orm'
+import { computeStats, computeTimelineWithSets } from '../../lib/utils/stats'
+import type { Player, MatchSet, Point } from '../../types'
+
+const env = Astro.locals.runtime.env
+const db = getDb(env.DB)
+const { uuid } = Astro.params as { uuid: string }
+
+const match = await db.select().from(matches).where(eq(matches.shareUuid, uuid)).get()
+if (!match) return Astro.redirect('/')
+
+const team = await db.select().from(teams).where(eq(teams.id, match.teamId)).get()
+const dbSets = await db.select().from(matchSets).where(eq(matchSets.matchId, match.id))
+const dbPoints = await db.select().from(points).where(eq(points.matchId, match.id))
+const dbPlayers = await db.select().from(players).where(eq(players.teamId, match.teamId))
+
+// Map to snake_case for React components and utils
+const setsForClient: MatchSet[] = dbSets.map((s) => ({
+  id: s.id,
+  match_id: s.matchId,
+  set_number: s.setNumber,
+  home_score: s.homeScore,
+  away_score: s.awayScore,
+  winner: s.winner as MatchSet['winner'],
+  completed: s.completed,
+  created_at: s.createdAt,
+}))
+
+const pointsForUtils: Point[] = dbPoints.map((p) => ({
+  id: p.id,
+  match_id: p.matchId,
+  set_id: p.setId,
+  point_number: p.pointNumber,
+  scorer: p.scorer as Point['scorer'],
+  home_score: p.homeScore,
+  away_score: p.awayScore,
+  rotation_index: p.rotationIndex,
+  action_type: p.actionType as Point['action_type'],
+  player_id: p.playerId,
+  is_detail_logged: p.isDetailLogged,
+  created_at: p.createdAt,
+}))
+
+const playersForClient: Player[] = dbPlayers.map((p) => ({
+  id: p.id,
+  team_id: p.teamId,
+  name: p.name,
+  number: p.number,
+  position: p.position as Player['position'],
+  is_libero: p.isLibero,
+  created_at: p.createdAt,
+}))
+
+const stats = computeStats(pointsForUtils, playersForClient, match.detailLogStartPoint)
+stats.scoreTimeline = computeTimelineWithSets(
+  pointsForUtils,
+  dbSets.map((s) => ({ id: s.id, set_number: s.setNumber }))
+)
+---
+<Base title={`${team?.name ?? ''} vs ${match.opponentName} 試合結果`}>
+  <div class="min-h-screen bg-gray-50">
+    <header class="bg-white border-b px-4 py-3 flex items-center justify-between sticky top-0">
+      <span class="text-xl font-bold text-blue-600">V-Log</span>
+      <span class="text-xs text-gray-400">試合結果（公開）</span>
+    </header>
+
+    <main class="max-w-2xl mx-auto p-4">
+      <ResultWithToaster
+        client:load
+        teamName={team?.name ?? '自チーム'}
+        opponentName={match.opponentName}
+        matchDate={match.matchDate}
+        location={match.location}
+        sets={setsForClient}
+        stats={stats}
+        shareUuid={match.shareUuid}
+        showSharePanel={false}
+      />
+    </main>
+  </div>
+</Base>

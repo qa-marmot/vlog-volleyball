@@ -17,6 +17,11 @@
 /.next/
 /out/
 
+# astro / cloudflare
+/dist/
+/.astro/
+/.wrangler/
+
 # production
 /build
 

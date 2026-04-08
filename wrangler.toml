@@ -1,0 +1,10 @@
+name = "vlog-volleyball"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "vlog-volleyball"
+database_id = "c298d832-05ab-4deb-aa0e-7a203483cad7"
+migrations_dir = "drizzle/migrations"
