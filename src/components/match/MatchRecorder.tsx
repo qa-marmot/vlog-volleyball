@@ -150,11 +150,29 @@ export function MatchRecorder({
   // --- Setup screen ---
   if (!setupDone) {
     const nonLibero = players.filter((p) => !p.is_libero)
+
+    if (nonLibero.length === 0) {
+      return (
+        <div className="rounded-lg border bg-white p-6 text-center space-y-3">
+          <p className="text-sm font-medium text-slate-700">選手が登録されていません</p>
+          <p className="text-xs text-slate-500">
+            試合を記録するには先にチームページから選手を登録してください。
+          </p>
+          <a
+            href="javascript:history.back()"
+            className="inline-block text-sm text-blue-700 underline"
+          >
+            ← 戻る
+          </a>
+        </div>
+      )
+    }
+
     return (
       <div className="space-y-4">
-        <div className="bg-white rounded-xl border p-4">
+        <div className="rounded-lg border bg-white p-4">
           <h2 className="font-semibold mb-1">スタメン選択</h2>
-          <p className="text-xs text-gray-500 mb-3">
+          <p className="text-xs text-slate-500 mb-3">
             コートに立つ6名を選択してください（選んだ順がローテーション順になります）
           </p>
           <div className="space-y-2">
@@ -168,14 +186,14 @@ export function MatchRecorder({
                   className={`w-full flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors ${
                     selected
                       ? 'bg-blue-50 border-blue-400 text-blue-700'
-                      : 'hover:bg-gray-50'
+                      : 'hover:bg-slate-50'
                   }`}
                 >
                   <span>
-                    <span className="font-mono mr-2">#{p.number}</span>
+                    <span className="font-mono mr-2 text-slate-400">#{p.number}</span>
                     {p.name}
                     {p.position && (
-                      <span className="ml-2 text-xs text-gray-400">{p.position}</span>
+                      <span className="ml-2 text-xs text-slate-400">{p.position}</span>
                     )}
                   </span>
                   {selected && (
@@ -185,14 +203,17 @@ export function MatchRecorder({
               )
             })}
           </div>
-          <p className="text-xs text-gray-400 mt-2">
-            {selectedRotation.length}/6 人選択中
+          <p className="text-xs text-slate-400 mt-3">
+            {selectedRotation.length} / 6 人選択中
+            {nonLibero.length < 6 && (
+              <span className="ml-2 text-amber-600">（選手が6人未満です）</span>
+            )}
           </p>
         </div>
         <button
           onClick={handleStartMatch}
           disabled={selectedRotation.length !== 6}
-          className="w-full bg-blue-600 text-white rounded-xl py-3 font-semibold disabled:opacity-40"
+          className="w-full bg-blue-700 text-white rounded-lg py-3 font-semibold disabled:opacity-40 transition-opacity"
         >
           試合を開始する
         </button>

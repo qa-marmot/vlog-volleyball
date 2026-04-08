@@ -1,34 +1,39 @@
-// Post-build script: fix dist/server/wrangler.json for Cloudflare Pages compatibility
-// The @astrojs/cloudflare adapter generates some fields that are invalid for Pages:
-//   - "triggers": {} → must be { crons: [] } or omitted
-//   - "kv_namespaces" with binding: false (when sessionKVBindingName is unused)
-//   - "assets" binding named "ASSETS" (reserved name in Pages)
+// Post-build script: patch output for Cloudflare Pages GitHub integration.
+//
+// Problem 1: @astrojs/cloudflare generates dist/server/wrangler.json with
+// Workers-only fields (main, rules, no_bundle) that CF Pages rejects.
+// It also creates .wrangler/deploy/config.json which redirects CF Pages to
+// that invalid config.
+//
+// Problem 2: @astrojs/cloudflare puts static assets in dist/client/ but
+// CF Pages advanced mode (_worker.js) serves ASSETS from dist/ root.
+// Result: /_astro/*.css returns 404 because CF Pages can't find the files.
+//
+// Solution:
+//   1. Copy dist/client/ contents up to dist/ so ASSETS binding can serve them.
+//   2. Create dist/_worker.js so CF Pages (advanced mode) finds the entry point.
+//   3. Delete .wrangler/deploy/config.json so CF Pages uses wrangler.toml directly.
 
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, rmSync, existsSync, readdirSync, cpSync } from 'fs'
 
-const path = 'dist/server/wrangler.json'
-if (!existsSync(path)) process.exit(0)
-
-const config = JSON.parse(readFileSync(path, 'utf8'))
-
-// Fix triggers: {} → { crons: [] }
-if (config.triggers !== undefined && !Array.isArray(config.triggers?.crons)) {
-  config.triggers = { crons: [] }
+// 1. Hoist dist/client/ contents to dist/
+if (existsSync('dist/client')) {
+  cpSync('dist/client', 'dist', { recursive: true })
+  console.log('✓ Hoisted dist/client/ → dist/')
 }
 
-// Remove KV namespace entries that have no "id" field
-// The adapter adds a SESSION KV stub without an id, which Pages rejects.
-// Since we don't use Astro.session, this binding is not needed.
-if (Array.isArray(config.kv_namespaces)) {
-  config.kv_namespaces = config.kv_namespaces.filter(
-    (kv) => typeof kv.id === 'string' && kv.id.length > 0
-  )
+// 2. Create dist/_worker.js that re-exports the Astro SSR handler
+writeFileSync(
+  'dist/_worker.js',
+  `export { default } from './server/entry.mjs';\n`
+)
+console.log('✓ Created dist/_worker.js')
+
+// 3. Remove the redirect file so CF Pages uses wrangler.toml
+const redirectFile = '.wrangler/deploy/config.json'
+if (existsSync(redirectFile)) {
+  rmSync(redirectFile)
+  console.log('✓ Removed .wrangler/deploy/config.json')
 }
 
-// Remove the auto-generated "ASSETS" binding — Pages reserves this name automatically
-if (config.assets?.binding === 'ASSETS') {
-  delete config.assets
-}
-
-writeFileSync(path, JSON.stringify(config))
-console.log('✓ dist/server/wrangler.json patched for Cloudflare Pages')
+console.log('✓ Cloudflare Pages build patched')
