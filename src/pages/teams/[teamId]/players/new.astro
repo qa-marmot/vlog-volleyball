@@ -73,6 +73,12 @@ if (!team) return Astro.redirect('/dashboard')
 
   isLiberoCheck.addEventListener('change', () => {
     if (isLiberoCheck.checked) positionSelect.value = 'L'
+    else if (positionSelect.value === 'L') positionSelect.value = ''
+  })
+
+  positionSelect.addEventListener('change', () => {
+    if (positionSelect.value === 'L') isLiberoCheck.checked = true
+    else isLiberoCheck.checked = false
   })
 
   form.addEventListener('submit', async (e) => {

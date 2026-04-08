@@ -62,10 +62,9 @@ export function SharePanel({
       {/* LINE共有 */}
       <Button
         onClick={handleLineShare}
-        className="w-full bg-[#06C755] hover:bg-[#05b34e] text-white"
+        className="w-full bg-[#06C755] hover:bg-[#05b34e] text-white font-semibold"
       >
-        <span className="mr-2 text-lg">⬆</span>
-        LINEで共有
+        LINE で共有する
       </Button>
     </div>
   )

@@ -51,17 +51,12 @@ export function MatchResultView({
       />
 
       {/* ログ密度表示 */}
-      <div className="flex items-center gap-2 text-xs">
-        <Badge variant={stats.hasDetailLog ? 'default' : 'secondary'}>
-          {stats.hasDetailLog ? '詳細分析モード' : '基本表示モード'}
-        </Badge>
-        <span className="text-muted-foreground">
-          詳細ログ: {Math.round(stats.detailLogCoverage * 100)}%
-          {!stats.hasDetailLog && stats.detailLogCoverage > 0 && (
-            <span> (50%以上で詳細分析が表示されます)</span>
-          )}
-        </span>
-      </div>
+      {!stats.hasDetailLog && stats.detailLogCoverage > 0 && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="secondary">基本表示</Badge>
+          <span>詳細ログが50%未満のため得点ランキング・ローテーション分析は非表示です</span>
+        </div>
+      )}
 
       {/* 点数推移チャート（Phase 3） */}
       {stats.scoreTimeline.length > 0 && (

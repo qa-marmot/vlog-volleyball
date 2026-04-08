@@ -100,33 +100,32 @@ const positionFull: Record<string, string> = {
 
         {recentMatches.length > 0 ? (
           <div class="card divide-y divide-slate-100">
-            {recentMatches.map((match) => (
-              <div class="flex items-center justify-between px-4 py-3">
-                <div>
-                  <div class="text-sm font-medium text-slate-800">
-                    {team.name} <span class="text-slate-400 font-normal">vs</span> {match.opponentName}
+            {recentMatches.map((match) => {
+              const href = match.status === 'in_progress'
+                ? `/matches/${match.id}/record`
+                : `/matches/${match.id}/result`
+              return (
+                <a href={href}
+                  class="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors">
+                  <div>
+                    <div class="text-sm font-medium text-slate-800">
+                      {team.name} <span class="text-slate-400 font-normal">vs</span> {match.opponentName}
+                    </div>
+                    <div class="text-xs text-slate-400 mt-0.5">
+                      {match.matchDate}{match.location ? ` · ${match.location}` : ''}
+                    </div>
                   </div>
-                  <div class="text-xs text-slate-400 mt-0.5">
-                    {match.matchDate}{match.location ? ` · ${match.location}` : ''}
-                  </div>
-                </div>
-                <div class="flex items-center gap-2">
                   <span class={match.status === 'completed' ? 'badge-done' : 'badge-active'}>
                     {match.status === 'completed' ? '終了' : '● 進行中'}
                   </span>
-                  <div class="flex gap-1">
-                    {match.status === 'in_progress' && (
-                      <a href={`/matches/${match.id}/record`} class="text-xs text-blue-700 hover:underline px-1">記録</a>
-                    )}
-                    <a href={`/matches/${match.id}/result`} class="text-xs text-slate-500 hover:underline px-1">結果</a>
-                  </div>
-                </div>
-              </div>
-            ))}
+                </a>
+              )
+            })}
           </div>
         ) : (
           <div class="card px-4 py-6 text-center">
             <p class="text-sm text-slate-500">試合履歴がありません</p>
+            <a href={`/matches/new?teamId=${teamId}`} class="inline-block mt-3 btn-accent text-xs px-4 py-1.5">+ 試合を記録</a>
           </div>
         )}
       </section>
