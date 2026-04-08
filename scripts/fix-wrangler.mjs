@@ -1,34 +1,28 @@
-// Post-build script: fix dist/server/wrangler.json for Cloudflare Pages compatibility
-// The @astrojs/cloudflare adapter generates some fields that are invalid for Pages:
-//   - "triggers": {} → must be { crons: [] } or omitted
-//   - "kv_namespaces" with binding: false (when sessionKVBindingName is unused)
-//   - "assets" binding named "ASSETS" (reserved name in Pages)
+// Post-build script: patch output for Cloudflare Pages GitHub integration.
+//
+// Problem: @astrojs/cloudflare generates dist/server/wrangler.json with
+// Workers-only fields (main, rules, no_bundle) that CF Pages rejects.
+// It also creates .wrangler/deploy/config.json which redirects CF Pages to
+// that invalid config.
+//
+// Solution:
+//   1. Create dist/_worker.js so CF Pages (advanced mode) finds the entry point.
+//   2. Delete .wrangler/deploy/config.json so CF Pages uses wrangler.toml directly.
 
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, rmSync, existsSync } from 'fs'
 
-const path = 'dist/server/wrangler.json'
-if (!existsSync(path)) process.exit(0)
+// 1. Create dist/_worker.js that re-exports the Astro SSR handler
+writeFileSync(
+  'dist/_worker.js',
+  `export { default } from './server/entry.mjs';\n`
+)
+console.log('✓ Created dist/_worker.js')
 
-const config = JSON.parse(readFileSync(path, 'utf8'))
-
-// Fix triggers: {} → { crons: [] }
-if (config.triggers !== undefined && !Array.isArray(config.triggers?.crons)) {
-  config.triggers = { crons: [] }
+// 2. Remove the redirect file so CF Pages uses wrangler.toml
+const redirectFile = '.wrangler/deploy/config.json'
+if (existsSync(redirectFile)) {
+  rmSync(redirectFile)
+  console.log('✓ Removed .wrangler/deploy/config.json')
 }
 
-// Remove KV namespace entries that have no "id" field
-// The adapter adds a SESSION KV stub without an id, which Pages rejects.
-// Since we don't use Astro.session, this binding is not needed.
-if (Array.isArray(config.kv_namespaces)) {
-  config.kv_namespaces = config.kv_namespaces.filter(
-    (kv) => typeof kv.id === 'string' && kv.id.length > 0
-  )
-}
-
-// Remove the auto-generated "ASSETS" binding — Pages reserves this name automatically
-if (config.assets?.binding === 'ASSETS') {
-  delete config.assets
-}
-
-writeFileSync(path, JSON.stringify(config))
-console.log('✓ dist/server/wrangler.json patched for Cloudflare Pages')
+console.log('✓ Cloudflare Pages build patched')
