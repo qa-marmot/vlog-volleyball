@@ -1,9 +1,9 @@
 import type { APIRoute } from 'astro'
+import { env } from 'cloudflare:workers'
 import { app } from '../../lib/hono'
 
-export const ALL: APIRoute = ({ request, locals }) => {
-  const env = (locals as App.Locals).runtime?.env
-  return app.fetch(request, env)
+export const ALL: APIRoute = ({ request }) => {
+  return app.fetch(request, env as unknown as Env)
 }
 
 export const prerender = false

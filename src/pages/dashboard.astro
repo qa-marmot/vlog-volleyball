@@ -5,7 +5,7 @@ import { teamMembers, teams, matches } from '../schema'
 import { eq, inArray } from 'drizzle-orm'
 
 const user = Astro.locals.user!
-const env = Astro.locals.runtime.env
+import { env } from 'cloudflare:workers'
 const db = getDb(env.DB)
 
 const memberships = await db.select({ role: teamMembers.role, team: teams })

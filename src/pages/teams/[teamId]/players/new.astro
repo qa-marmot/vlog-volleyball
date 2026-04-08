@@ -5,7 +5,7 @@ import { teams, teamMembers } from '../../../../schema'
 import { eq, and } from 'drizzle-orm'
 
 const user = Astro.locals.user!
-const env = Astro.locals.runtime.env
+import { env } from 'cloudflare:workers'
 const db = getDb(env.DB)
 const { teamId } = Astro.params as { teamId: string }
 

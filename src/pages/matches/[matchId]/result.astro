@@ -8,7 +8,7 @@ import { computeStats, computeTimelineWithSets } from '../../../lib/utils/stats'
 import type { Player, MatchSet, Point } from '../../../types'
 
 const user = Astro.locals.user!
-const env = Astro.locals.runtime.env
+import { env } from 'cloudflare:workers'
 const db = getDb(env.DB)
 const { matchId } = Astro.params as { matchId: string }
 
