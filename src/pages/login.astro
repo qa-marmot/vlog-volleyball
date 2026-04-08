@@ -2,68 +2,51 @@
 import Base from '../layouts/Base.astro'
 ---
 <Base title="ログイン">
-  <div class="min-h-screen flex items-center justify-center p-4"
-       style="background: linear-gradient(160deg, #0f2044 0%, #1a3a8f 50%, #1a56db 100%)">
-
-    <!-- Background decoration -->
-    <div class="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-      <div class="absolute -top-32 -right-32 w-96 h-96 rounded-full opacity-10"
-           style="background: radial-gradient(circle, #f97316, transparent)"></div>
-      <div class="absolute -bottom-32 -left-32 w-96 h-96 rounded-full opacity-10"
-           style="background: radial-gradient(circle, #fbbf24, transparent)"></div>
-    </div>
-
-    <div class="relative w-full max-w-sm">
-      <!-- Logo area -->
-      <div class="text-center mb-6">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full mb-3"
-             style="background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3)">
-          <span class="text-3xl">🏐</span>
+  <div class="min-h-screen flex flex-col justify-center items-center p-4 bg-slate-50">
+    <div class="w-full max-w-sm">
+      <!-- Logo -->
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded bg-blue-700 flex items-center justify-center">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.5" stroke="white" stroke-width="1.5"/>
+              <path d="M8 1.5C8 1.5 5 5 5 8s3 6.5 3 6.5" stroke="white" stroke-width="1.5"/>
+              <path d="M1.5 8h13" stroke="white" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <span class="text-xl font-bold text-slate-900 tracking-tight">V-Log</span>
         </div>
-        <div class="text-3xl font-black text-white tracking-tight">V-Log</div>
-        <div class="text-sm text-blue-200 mt-1">バレーボール記録アプリ</div>
+        <p class="text-sm text-slate-500">バレーボール試合記録</p>
       </div>
 
       <!-- Card -->
-      <div class="rounded-2xl p-6 space-y-5"
-           style="background: rgba(255,255,255,0.97); box-shadow: 0 25px 50px rgba(0,0,0,0.4)">
-        <div>
-          <h1 class="text-xl font-bold text-gray-900">ログイン</h1>
-          <p class="text-sm text-gray-500 mt-0.5">チームのアカウントでサインイン</p>
-        </div>
+      <div class="card p-6">
+        <h1 class="text-base font-semibold text-slate-900 mb-5">ログイン</h1>
 
         <form id="login-form" class="space-y-4">
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5" for="email">
-              メールアドレス
-            </label>
+            <label class="block text-sm font-medium text-slate-700 mb-1.5" for="email">メールアドレス</label>
             <input id="email" name="email" type="email" required autocomplete="email"
-              class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:bg-white transition-all"
-              style="--tw-ring-color: #1a56db"
-              placeholder="example@email.com" />
+              class="field-input" placeholder="example@email.com" />
           </div>
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5" for="password">
-              パスワード
-            </label>
+            <label class="block text-sm font-medium text-slate-700 mb-1.5" for="password">パスワード</label>
             <input id="password" name="password" type="password" required autocomplete="current-password"
-              class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:bg-white transition-all"
-              style="--tw-ring-color: #1a56db"
-              placeholder="••••••••" />
+              class="field-input" placeholder="••••••••" />
           </div>
-          <p id="error-msg" class="text-red-500 text-sm hidden bg-red-50 rounded-lg px-3 py-2"></p>
-          <button type="submit"
-            class="w-full text-white rounded-xl py-3 font-bold text-sm hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
-            style="background: linear-gradient(135deg, #1a56db, #0f2044)">
-            ログイン
-          </button>
+          <p id="error-msg" class="hidden text-sm text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2"></p>
+          <button type="submit" class="btn-primary w-full py-2.5">ログイン</button>
         </form>
 
-        <p class="text-center text-sm text-gray-500">
+        <p class="mt-4 text-center text-sm text-slate-500">
           アカウントをお持ちでない方は
-          <a href="/register" class="font-semibold" style="color: #1a56db">新規登録</a>
+          <a href="/register" class="text-blue-700 font-medium hover:underline">新規登録</a>
         </p>
       </div>
+
+      <p class="mt-4 text-center text-xs text-slate-400">
+        <a href="/help" class="hover:underline">使い方を見る</a>
+      </p>
     </div>
   </div>
 </Base>

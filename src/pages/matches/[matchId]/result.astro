@@ -68,22 +68,18 @@ stats.scoreTimeline = computeTimelineWithSets(
 )
 ---
 <Base title="試合結果">
-  <div class="min-h-screen" style="background: #f0f4ff">
-    <header class="vball-header sticky top-0 z-10 px-4 py-3">
+  <div class="min-h-screen bg-slate-50">
+    <header class="app-header px-4 py-3 sticky top-0 z-10">
       <div class="max-w-2xl mx-auto flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <a href="/dashboard" class="text-blue-200 hover:text-white text-sm transition-colors">←</a>
+          <a href="/dashboard" class="text-slate-400 hover:text-white text-sm transition-colors">←</a>
           <div>
-            <div class="font-bold text-white text-sm">{team?.name} <span class="text-blue-300">vs</span> {match.opponentName}</div>
-            <div class="text-blue-300 text-xs">{match.matchDate} · 試合結果</div>
+            <div class="text-sm font-semibold text-white">{team?.name} <span class="text-slate-400">vs</span> {match.opponentName}</div>
+            <div class="text-xs text-slate-400">{match.matchDate}</div>
           </div>
         </div>
         {match.status === 'in_progress' && (
-          <a href={`/matches/${matchId}/record`}
-            class="text-xs font-bold rounded-xl px-3 py-1.5 transition-colors"
-            style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3)">
-            記録に戻る
-          </a>
+          <a href={`/matches/${matchId}/record`} class="btn-secondary text-xs px-3 py-1.5">記録に戻る</a>
         )}
       </div>
     </header>

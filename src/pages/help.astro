@@ -1,0 +1,191 @@
+---
+import Base from '../layouts/Base.astro'
+---
+<Base title="使い方">
+  <div class="min-h-screen bg-slate-50">
+    <header class="app-header px-4 py-3 sticky top-0 z-10">
+      <div class="max-w-2xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="opacity-80">
+            <circle cx="8" cy="8" r="6.5" stroke="white" stroke-width="1.5"/>
+            <path d="M8 1.5C8 1.5 5 5 5 8s3 6.5 3 6.5" stroke="white" stroke-width="1.5"/>
+            <path d="M1.5 8h13" stroke="white" stroke-width="1.5"/>
+          </svg>
+          <span class="font-bold text-white tracking-tight">V-Log</span>
+        </div>
+        <a href="/login" class="text-xs text-slate-400 hover:text-slate-200 transition-colors">ログイン</a>
+      </div>
+    </header>
+
+    <main class="max-w-2xl mx-auto p-4 pb-12">
+      <!-- Hero -->
+      <div class="py-10 text-center">
+        <h1 class="text-2xl font-bold text-slate-900 mb-3">V-Log の使い方</h1>
+        <p class="text-slate-500 text-sm leading-relaxed max-w-md mx-auto">
+          バレーボールの試合スコアをリアルタイムに記録し、セット・ポイントごとの流れを振り返れるアプリです。
+        </p>
+        <div class="mt-6 flex justify-center gap-3">
+          <a href="/register" class="btn-primary px-5 py-2">無料で始める</a>
+          <a href="/login" class="btn-secondary px-5 py-2">ログイン</a>
+        </div>
+      </div>
+
+      <!-- Steps -->
+      <div class="space-y-3">
+        <!-- Step 1 -->
+        <div class="card p-5">
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-700 text-white text-sm font-bold flex items-center justify-center">
+              1
+            </div>
+            <div class="flex-1">
+              <h2 class="font-semibold text-slate-900 mb-1">アカウントを作成する</h2>
+              <p class="text-sm text-slate-500 leading-relaxed">
+                メールアドレスとパスワードで無料登録できます。登録後すぐにチームの作成や試合の記録を始められます。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="card p-5">
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-700 text-white text-sm font-bold flex items-center justify-center">
+              2
+            </div>
+            <div class="flex-1">
+              <h2 class="font-semibold text-slate-900 mb-1">チームを作成する</h2>
+              <p class="text-sm text-slate-500 leading-relaxed mb-3">
+                ダッシュボードの「+ 作成」からチームを登録します。作成すると6文字の招待コードが発行されます。
+              </p>
+              <div class="bg-slate-900 rounded inline-block px-4 py-2">
+                <span class="font-mono text-base font-bold text-white tracking-widest">ABCD12</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-2">
+                このコードをチームメンバーに共有すると、同じチームに参加してもらえます。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="card p-5">
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-700 text-white text-sm font-bold flex items-center justify-center">
+              3
+            </div>
+            <div class="flex-1">
+              <h2 class="font-semibold text-slate-900 mb-1">選手を登録する</h2>
+              <p class="text-sm text-slate-500 leading-relaxed">
+                チームページの「+ 追加」から選手を登録します。背番号・ポジション・リベロ有無を設定できます。
+                試合記録でスターティングラインナップを選択する際に使います。
+              </p>
+              <div class="mt-3 flex flex-wrap gap-1.5">
+                {['セッター', 'アウトサイドヒッター', 'ミドルブロッカー', 'オポジット', 'リベロ'].map(p => (
+                  <span class="text-xs bg-slate-100 text-slate-600 rounded px-2 py-0.5">{p}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="card p-5">
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-orange-600 text-white text-sm font-bold flex items-center justify-center">
+              4
+            </div>
+            <div class="flex-1">
+              <h2 class="font-semibold text-slate-900 mb-1">試合を記録する</h2>
+              <p class="text-sm text-slate-500 leading-relaxed mb-3">
+                「+ 試合を記録」から相手チーム名・試合日・場所を入力して記録を開始します。
+              </p>
+              <div class="space-y-2 text-sm">
+                <div class="flex items-start gap-2">
+                  <span class="flex-shrink-0 w-5 h-5 rounded bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center mt-0.5">+</span>
+                  <span class="text-slate-600">自チームのポイントと相手チームのポイントをタップして記録</span>
+                </div>
+                <div class="flex items-start gap-2">
+                  <span class="flex-shrink-0 w-5 h-5 rounded bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center mt-0.5">↩</span>
+                  <span class="text-slate-600">直前のポイントを取り消すアンドゥ機能あり</span>
+                </div>
+                <div class="flex items-start gap-2">
+                  <span class="flex-shrink-0 w-5 h-5 rounded bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center mt-0.5">↻</span>
+                  <span class="text-slate-600">オフライン記録対応。ネット接続時に自動同期</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="card p-5">
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-700 text-white text-sm font-bold flex items-center justify-center">
+              5
+            </div>
+            <div class="flex-1">
+              <h2 class="font-semibold text-slate-900 mb-1">試合結果を確認・共有する</h2>
+              <p class="text-sm text-slate-500 leading-relaxed mb-2">
+                試合終了後、セット別スコア・得点の流れ・選手別スタッツをグラフで確認できます。
+              </p>
+              <p class="text-sm text-slate-500 leading-relaxed">
+                結果ページには共有用のURLが発行されます。ログインなしで閲覧できるため、
+                選手やコーチに試合の流れを共有するのに使えます。
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FAQ -->
+      <div class="mt-8">
+        <h2 class="text-sm font-semibold text-slate-900 mb-3">よくある質問</h2>
+        <div class="card divide-y divide-slate-100">
+          <details class="px-4 py-3 group">
+            <summary class="text-sm font-medium text-slate-700 cursor-pointer list-none flex items-center justify-between">
+              複数のチームに所属できますか？
+              <span class="text-slate-400 group-open:rotate-90 transition-transform">›</span>
+            </summary>
+            <p class="text-sm text-slate-500 mt-2 leading-relaxed">
+              はい。招待コードを使って複数のチームに参加できます。ダッシュボードには所属するすべてのチームの試合履歴が表示されます。
+            </p>
+          </details>
+          <details class="px-4 py-3 group">
+            <summary class="text-sm font-medium text-slate-700 cursor-pointer list-none flex items-center justify-between">
+              オフラインでも記録できますか？
+              <span class="text-slate-400 group-open:rotate-90 transition-transform">›</span>
+            </summary>
+            <p class="text-sm text-slate-500 mt-2 leading-relaxed">
+              はい。試合記録画面はオフラインでも動作します。記録はブラウザのローカルストレージに保持され、ネットワーク接続が回復した際に自動的にサーバーへ同期されます。
+            </p>
+          </details>
+          <details class="px-4 py-3 group">
+            <summary class="text-sm font-medium text-slate-700 cursor-pointer list-none flex items-center justify-between">
+              試合の共有URLは誰でも見られますか？
+              <span class="text-slate-400 group-open:rotate-90 transition-transform">›</span>
+            </summary>
+            <p class="text-sm text-slate-500 mt-2 leading-relaxed">
+              はい。共有URLはログイン不要で閲覧できます。URLを知っている人なら誰でもアクセス可能です。
+            </p>
+          </details>
+          <details class="px-4 py-3 group">
+            <summary class="text-sm font-medium text-slate-700 cursor-pointer list-none flex items-center justify-between">
+              詳細ログとは何ですか？
+              <span class="text-slate-400 group-open:rotate-90 transition-transform">›</span>
+            </summary>
+            <p class="text-sm text-slate-500 mt-2 leading-relaxed">
+              得点ごとにスパイク・サーブ・ブロック・レセプションなどのアクションと担当選手を記録する機能です。詳細ログを有効にすると選手ごとのスタッツが集計されます。
+            </p>
+          </details>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div class="mt-8 text-center">
+        <a href="/register" class="btn-primary px-8 py-3">無料で始める</a>
+        <p class="text-xs text-slate-400 mt-3">アカウント登録は無料です</p>
+      </div>
+    </main>
+  </div>
+</Base>
