@@ -34,11 +34,13 @@ export default function NewTeamPage() {
 
     if (error) { toast.error(toJapaneseError(error.message)); setLoading(false); return }
 
-    await supabase.from('team_members').insert({
+    const { error: memberError } = await supabase.from('team_members').insert({
       team_id: team.id,
       user_id: user.id,
       role: 'owner',
     })
+
+    if (memberError) { toast.error(toJapaneseError(memberError.message)); setLoading(false); return }
 
     toast.success('チームを作成しました')
     router.push(`/teams/${team.id}`)

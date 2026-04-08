@@ -130,6 +130,11 @@ ALTER TABLE timeouts ENABLE ROW LEVEL SECURITY;
 
 -- ---- teams ----
 -- チームメンバーのみ読み取り
+-- オーナー自身は常に読める（チーム作成直後 team_members がない状態でも必要）
+CREATE POLICY "owner_can_read_own_teams" ON teams
+  FOR SELECT USING (owner_id = auth.uid());
+
+-- チームメンバーも読める
 CREATE POLICY "team_members_can_read_teams" ON teams
   FOR SELECT USING (
     id IN (
