@@ -17,8 +17,10 @@ export default async function DashboardPage() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
+  type TeamData = { id: string; name: string; invite_code: string }
+
   // 試合履歴取得（参加チームの試合）
-  const teamIds = memberships?.map((m) => (m.teams as { id: string }).id) ?? []
+  const teamIds = memberships?.map((m) => (m.teams as unknown as TeamData).id) ?? []
   const { data: matches } = teamIds.length > 0
     ? await supabase
         .from('matches')
@@ -54,7 +56,7 @@ export default async function DashboardPage() {
           {memberships && memberships.length > 0 ? (
             <div className="space-y-2">
               {memberships.map((m) => {
-                const team = m.teams as { id: string; name: string; invite_code: string }
+                const team = m.teams as unknown as TeamData
                 return (
                   <Link key={team.id} href={`/teams/${team.id}`}>
                     <Card className="hover:bg-muted/30 transition-colors cursor-pointer">
@@ -96,7 +98,7 @@ export default async function DashboardPage() {
           {matches && matches.length > 0 ? (
             <div className="space-y-2">
               {matches.map((match) => {
-                const team = match.teams as { name: string }
+                const team = match.teams as unknown as { name: string }
                 return (
                   <Card key={match.id} className="hover:bg-muted/30 transition-colors">
                     <CardContent className="py-3 px-4 flex items-center justify-between">

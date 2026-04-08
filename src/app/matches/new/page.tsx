@@ -36,7 +36,7 @@ function NewMatchForm() {
         .select('teams(id, name)')
         .eq('user_id', user.id)
         .then(({ data }) => {
-          const t = data?.map((m) => m.teams as { id: string; name: string }) ?? []
+          const t = data?.map((m) => m.teams as unknown as { id: string; name: string }) ?? []
           setTeams(t)
           if (!selectedTeamId && t.length > 0) setSelectedTeamId(t[0].id)
         })
