@@ -34,9 +34,10 @@ export function MatchRecorder({
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [pendingScorer, setPendingScorer] = useState<'home' | 'away' | null>(null)
 
-  // Setup state: pick starting 6 rotation
+  // Setup state
   const [setupDone, setSetupDone] = useState(false)
   const [selectedRotation, setSelectedRotation] = useState<string[]>([])
+  const [selectedServingTeam, setSelectedServingTeam] = useState<'home' | 'away' | null>(null)
 
   useEffect(() => {
     if (store.matchId === matchId) {
@@ -45,7 +46,7 @@ export function MatchRecorder({
   }, [matchId, store.matchId])
 
   function handleStartMatch() {
-    if (selectedRotation.length !== 6) return
+    if (selectedRotation.length !== 6 || !selectedServingTeam) return
     const liberoPlayer = players.find((p) => p.is_libero)
     store.initMatch({
       matchId,
@@ -57,6 +58,7 @@ export function MatchRecorder({
       roster: players,
       startingRotation: selectedRotation,
       liberoId: liberoPlayer?.id ?? null,
+      servingTeam: selectedServingTeam,
     })
     setSetupDone(true)
   }
@@ -158,22 +160,22 @@ export function MatchRecorder({
           <p className="text-xs text-slate-500">
             試合を記録するには先にチームページから選手を登録してください。
           </p>
-          <a
-            href="javascript:history.back()"
-            className="inline-block text-sm text-blue-700 underline"
-          >
+          <a href="javascript:history.back()" className="inline-block text-sm text-blue-700 underline">
             ← 戻る
           </a>
         </div>
       )
     }
 
+    const canStart = selectedRotation.length === 6 && selectedServingTeam !== null
+
     return (
       <div className="space-y-4">
+        {/* スタメン選択 */}
         <div className="rounded-lg border bg-white p-4">
           <h2 className="font-semibold mb-1">スタメン選択</h2>
           <p className="text-xs text-slate-500 mb-3">
-            コートに立つ6名を選択してください（選んだ順がローテーション順になります）
+            コートに立つ6名を選択（選んだ順がローテーション順になります）
           </p>
           <div className="space-y-2">
             {nonLibero.map((p) => {
@@ -183,7 +185,7 @@ export function MatchRecorder({
                 <button
                   key={p.id}
                   onClick={() => toggleRotationPlayer(p.id)}
-                  className={`w-full flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  className={`w-full flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition-colors ${
                     selected
                       ? 'bg-blue-50 border-blue-400 text-blue-700'
                       : 'hover:bg-slate-50'
@@ -210,9 +212,42 @@ export function MatchRecorder({
             )}
           </p>
         </div>
+
+        {/* サーブ権選択 */}
+        <div className="rounded-lg border bg-white p-4">
+          <h2 className="font-semibold mb-1">最初のサーブ権</h2>
+          <p className="text-xs text-slate-500 mb-3">
+            第1セットで最初にサーブするチームを選択してください
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setSelectedServingTeam('home')}
+              className={`rounded-xl border-2 py-4 text-sm font-semibold transition-colors ${
+                selectedServingTeam === 'home'
+                  ? 'bg-blue-50 border-blue-500 text-blue-700'
+                  : 'border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              🏐 {teamName}
+              <span className="block text-xs font-normal mt-0.5 opacity-70">自チーム</span>
+            </button>
+            <button
+              onClick={() => setSelectedServingTeam('away')}
+              className={`rounded-xl border-2 py-4 text-sm font-semibold transition-colors ${
+                selectedServingTeam === 'away'
+                  ? 'bg-red-50 border-red-400 text-red-700'
+                  : 'border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              🏐 {opponentName}
+              <span className="block text-xs font-normal mt-0.5 opacity-70">相手チーム</span>
+            </button>
+          </div>
+        </div>
+
         <button
           onClick={handleStartMatch}
-          disabled={selectedRotation.length !== 6}
+          disabled={!canStart}
           className="w-full bg-blue-700 text-white rounded-lg py-3 font-semibold disabled:opacity-40 transition-opacity"
         >
           試合を開始する
@@ -251,6 +286,7 @@ export function MatchRecorder({
         awayScore={store.awayScore}
         currentSetNumber={store.currentSetNumber}
         setsResult={setsResult}
+        servingTeam={store.servingTeam}
       />
 
       {/* Rotation */}
@@ -260,8 +296,10 @@ export function MatchRecorder({
           players={players}
           liberoId={store.liberoId}
           liberoSubstitutedFor={store.liberoSubstitutedFor}
+          servingTeam={store.servingTeam}
           onLiberoSub={store.substituteLibero}
           onRestoreLibero={store.restoreLibero}
+          onSubstitutePlayer={store.substitutePlayer}
         />
       )}
 
@@ -271,28 +309,36 @@ export function MatchRecorder({
         opponentName={opponentName}
         onScore={handleScore}
         onEndSet={store.endSet}
-        onRotate={store.rotateTeam}
         onTimeout={store.addTimeout}
       />
 
-      {/* Undo + detail log toggle */}
+      {/* Undo + detail log status */}
       <div className="flex items-center justify-between">
         <UndoButton
           onUndo={store.undoLastPoint}
-          disabled={store.eventHistory.length === 0}
+          disabled={
+            store.eventHistory.length === 0 ||
+            store.eventHistory[store.eventHistory.length - 1].type !== 'point'
+          }
         />
-        {!store.detailLogEnabled && (
-          <button
-            onClick={store.enableDetailLog}
-            className="text-xs text-blue-600 underline"
-          >
-            詳細ログを開始
-          </button>
-        )}
         {store.detailLogEnabled && (
-          <span className="text-xs text-green-600">詳細ログ記録中</span>
+          <span className="text-xs font-medium text-green-600 flex items-center gap-1">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500"></span>
+            詳細ログ記録中
+          </span>
         )}
       </div>
+
+      {/* Detail log start button */}
+      {!store.detailLogEnabled && (
+        <button
+          onClick={store.enableDetailLog}
+          className="w-full rounded-xl border-2 border-dashed border-blue-200 bg-blue-50 px-4 py-4 text-left hover:bg-blue-100 transition-colors"
+        >
+          <span className="block text-sm font-semibold text-blue-700">詳細ログを開始する</span>
+          <span className="block text-xs text-blue-500 mt-0.5">得点の種類（アタック・サーブ・ブロック等）と選手を記録してスタッツを集計</span>
+        </button>
+      )}
 
       {/* End match */}
       <div className="pt-2 border-t">

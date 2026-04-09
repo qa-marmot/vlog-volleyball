@@ -121,8 +121,44 @@ import Base from '../layouts/Base.astro'
         <!-- Step 5 -->
         <div class="card p-5">
           <div class="flex gap-4">
-            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-700 text-white text-sm font-bold flex items-center justify-center">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-orange-600 text-white text-sm font-bold flex items-center justify-center">
               5
+            </div>
+            <div class="flex-1">
+              <h2 class="font-semibold text-slate-900 mb-1">詳細ログで選手スタッツを記録する <span class="text-xs font-normal text-slate-400 ml-1">任意</span></h2>
+              <p class="text-sm text-slate-500 leading-relaxed mb-3">
+                記録画面の「詳細ログを開始する」ボタンを押すと、得点ごとにアクションの種類と担当選手を記録できます。途中から開始してもOKです。
+              </p>
+              <div class="space-y-2 text-sm">
+                <div class="flex items-start gap-2">
+                  <span class="flex-shrink-0 text-lg leading-none">💥</span>
+                  <span class="text-slate-600"><span class="font-medium">アタック</span> — スパイク・フェイントなど攻撃で得点</span>
+                </div>
+                <div class="flex items-start gap-2">
+                  <span class="flex-shrink-0 text-lg leading-none">🏐</span>
+                  <span class="text-slate-600"><span class="font-medium">サーブ</span> — サービスエースで得点</span>
+                </div>
+                <div class="flex items-start gap-2">
+                  <span class="flex-shrink-0 text-lg leading-none">🛡️</span>
+                  <span class="text-slate-600"><span class="font-medium">ブロック</span> — ブロックポイントで得点</span>
+                </div>
+                <div class="flex items-start gap-2">
+                  <span class="flex-shrink-0 text-lg leading-none">❌</span>
+                  <span class="text-slate-600"><span class="font-medium">相手ミス</span> — 相手チームのミスによる得点</span>
+                </div>
+              </div>
+              <p class="text-xs text-slate-400 mt-3 bg-slate-50 rounded px-3 py-2">
+                詳細ログが記録されると、試合結果ページで選手別のアタック・サーブ・ブロック得点数の内訳が表示されます。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="card p-5">
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-700 text-white text-sm font-bold flex items-center justify-center">
+              6
             </div>
             <div class="flex-1">
               <h2 class="font-semibold text-slate-900 mb-1">試合結果を確認・共有する</h2>
@@ -175,7 +211,7 @@ import Base from '../layouts/Base.astro'
               <span class="text-slate-400 group-open:rotate-90 transition-transform">›</span>
             </summary>
             <p class="text-sm text-slate-500 mt-2 leading-relaxed">
-              得点ごとにスパイク・サーブ・ブロック・レセプションなどのアクションと担当選手を記録する機能です。詳細ログを有効にすると選手ごとのスタッツが集計されます。
+              得点ごとに「アタック・サーブ・ブロック・相手ミス」の4種類から得点の内容と担当選手を記録する機能です。記録画面で「詳細ログを開始する」を押した時点から有効になります。詳細ログを有効にすると、試合結果ページで選手ごとのスタッツ（アタック・サーブ・ブロック得点数の内訳）が表示されます。
             </p>
           </details>
         </div>

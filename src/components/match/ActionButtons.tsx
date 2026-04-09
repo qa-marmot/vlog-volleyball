@@ -13,7 +13,6 @@ import {
 interface ActionButtonsProps {
   onScore: (scorer: 'home' | 'away') => void
   onEndSet: () => void
-  onRotate: () => void
   onTimeout: (caller: 'home' | 'away') => void
   teamName: string
   opponentName: string
@@ -23,7 +22,6 @@ interface ActionButtonsProps {
 export function ActionButtons({
   onScore,
   onEndSet,
-  onRotate,
   onTimeout,
   teamName,
   opponentName,
@@ -55,7 +53,7 @@ export function ActionButtons({
       </div>
 
       {/* サブアクション */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <Button
           variant="outline"
           onClick={() => setShowTimeoutMenu(true)}
@@ -63,14 +61,6 @@ export function ActionButtons({
           className="h-12"
         >
           タイムアウト
-        </Button>
-        <Button
-          variant="outline"
-          onClick={onRotate}
-          disabled={disabled}
-          className="h-12"
-        >
-          ローテーション
         </Button>
         <Button
           variant="destructive"

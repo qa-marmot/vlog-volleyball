@@ -95,6 +95,7 @@ export type GameEventType =
   | 'libero_sub'
   | 'set_end'
   | 'timeout'
+  | 'sub'
 
 export interface GameEvent {
   type: GameEventType
@@ -107,6 +108,11 @@ export interface GameEvent {
     currentRotation: string[]
     currentSetNumber: number
     totalSets: { home: number; away: number }
+    pointNumber: number
+    pendingPoints: unknown[]
+    servingTeam: 'home' | 'away'
+    rotationIndex: number
+    liberoSubstitutedFor: string | null
   }
 }
 

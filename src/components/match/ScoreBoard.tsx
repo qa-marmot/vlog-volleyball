@@ -7,6 +7,7 @@ interface ScoreBoardProps {
   awayScore: number
   currentSetNumber: number
   setsResult: Array<{ home: number; away: number; winner: 'home' | 'away' | null }>
+  servingTeam?: 'home' | 'away'
 }
 
 export function ScoreBoard({
@@ -16,6 +17,7 @@ export function ScoreBoard({
   awayScore,
   currentSetNumber,
   setsResult,
+  servingTeam,
 }: ScoreBoardProps) {
   const homeSets = setsResult.filter((s) => s.winner === 'home').length
   const awaySets = setsResult.filter((s) => s.winner === 'away').length
@@ -29,7 +31,10 @@ export function ScoreBoard({
       <div className="flex items-center justify-between gap-4">
         {/* 自チーム */}
         <div className="flex-1 text-center">
-          <div className="text-xs text-muted-foreground truncate mb-1">{teamName}</div>
+          <div className="flex items-center justify-center gap-1 mb-1">
+            {servingTeam === 'home' && <span className="text-base leading-none">🏐</span>}
+            <div className="text-xs text-muted-foreground truncate">{teamName}</div>
+          </div>
           <div className="text-6xl font-bold tabular-nums leading-none">{homeScore}</div>
           <div className="text-sm text-muted-foreground mt-1">{homeSets}セット</div>
         </div>
@@ -38,7 +43,10 @@ export function ScoreBoard({
 
         {/* 相手チーム */}
         <div className="flex-1 text-center">
-          <div className="text-xs text-muted-foreground truncate mb-1">{opponentName}</div>
+          <div className="flex items-center justify-center gap-1 mb-1">
+            {servingTeam === 'away' && <span className="text-base leading-none">🏐</span>}
+            <div className="text-xs text-muted-foreground truncate">{opponentName}</div>
+          </div>
           <div className="text-6xl font-bold tabular-nums leading-none">{awayScore}</div>
           <div className="text-sm text-muted-foreground mt-1">{awaySets}セット</div>
         </div>
