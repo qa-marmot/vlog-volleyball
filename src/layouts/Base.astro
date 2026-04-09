@@ -200,13 +200,15 @@ const { title = 'V-Log' } = Astro.props
   }
 
   /* Radix Dialog animations */
+  /* NOTE: Tailwind v4 uses the CSS `translate` property for -translate-x/y, not `transform`.
+     Keyframes must NOT include translate() to avoid doubling the offset. */
   @keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
   @keyframes fadeOut { from { opacity: 1 } to { opacity: 0 } }
-  @keyframes zoomIn  { from { transform: translate(-50%,-50%) scale(0.95) } to { transform: translate(-50%,-50%) scale(1) } }
-  @keyframes zoomOut { from { transform: translate(-50%,-50%) scale(1) } to { transform: translate(-50%,-50%) scale(0.95) } }
+  @keyframes zoomIn  { from { opacity: 0; transform: scale(0.95) } to { opacity: 1; transform: scale(1) } }
+  @keyframes zoomOut { from { opacity: 1; transform: scale(1) } to { opacity: 0; transform: scale(0.95) } }
 
   [data-state=open][data-slot=dialog-overlay]  { animation: fadeIn  150ms ease; }
   [data-state=closed][data-slot=dialog-overlay] { animation: fadeOut 150ms ease; }
-  [data-state=open][data-slot=dialog-content]   { animation: zoomIn  150ms ease; }
-  [data-state=closed][data-slot=dialog-content] { animation: zoomOut 150ms ease; }
+  [data-state=open][data-slot=dialog-content]   { animation: zoomIn  150ms ease forwards; }
+  [data-state=closed][data-slot=dialog-content] { animation: zoomOut 150ms ease forwards; }
 </style>
