@@ -164,46 +164,46 @@ const positionFull: Record<string, string> = {
       </section>
     </main>
   </div>
-</Base>
 
-<!-- 選手編集ダイアログ -->
-<dialog id="edit-player-dialog" class="rounded-xl shadow-xl p-0 w-full max-w-sm backdrop:bg-black/40">
-  <div class="p-5">
-    <h2 class="text-base font-semibold text-slate-900 mb-4">選手を編集</h2>
-    <form id="edit-player-form" class="space-y-4">
-      <input type="hidden" id="edit-player-id" />
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1.5" for="edit-name">名前</label>
-        <input id="edit-name" name="name" type="text" required class="field-input" />
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1.5" for="edit-number">背番号</label>
-        <input id="edit-number" name="number" type="number" required min="0" max="99" class="field-input" />
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1.5" for="edit-position">ポジション</label>
-        <select id="edit-position" name="position" class="field-input">
-          <option value="">未設定</option>
-          <option value="S">セッター (S)</option>
-          <option value="OH">アウトサイドヒッター (OH)</option>
-          <option value="MB">ミドルブロッカー (MB)</option>
-          <option value="OP">オポジット (OP)</option>
-          <option value="L">リベロ (L)</option>
-        </select>
-      </div>
-      <label class="flex items-center gap-3 cursor-pointer">
-        <input id="edit-is-libero" name="isLibero" type="checkbox"
-          class="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-700" />
-        <span class="text-sm text-slate-700">リベロとして登録</span>
-      </label>
-      <p id="edit-error-msg" class="hidden text-sm text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2"></p>
-      <div class="flex gap-2 pt-1">
-        <button type="button" id="edit-cancel-btn" class="flex-1 btn-secondary py-2.5">キャンセル</button>
-        <button type="submit" id="edit-submit-btn" class="flex-1 btn-primary py-2.5">保存する</button>
-      </div>
-    </form>
-  </div>
-</dialog>
+  <!-- 選手編集ダイアログ（<body>内に配置する必要あり） -->
+  <dialog id="edit-player-dialog" class="rounded-xl shadow-xl p-0 w-full max-w-sm backdrop:bg-black/40">
+    <div class="p-5">
+      <h2 class="text-base font-semibold text-slate-900 mb-4">選手を編集</h2>
+      <form id="edit-player-form" class="space-y-4">
+        <input type="hidden" id="edit-player-id" />
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5" for="edit-name">名前</label>
+          <input id="edit-name" name="name" type="text" required class="field-input" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5" for="edit-number">背番号</label>
+          <input id="edit-number" name="number" type="number" required min="0" max="99" class="field-input" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5" for="edit-position">ポジション</label>
+          <select id="edit-position" name="position" class="field-input">
+            <option value="">未設定</option>
+            <option value="S">セッター (S)</option>
+            <option value="OH">アウトサイドヒッター (OH)</option>
+            <option value="MB">ミドルブロッカー (MB)</option>
+            <option value="OP">オポジット (OP)</option>
+            <option value="L">リベロ (L)</option>
+          </select>
+        </div>
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input id="edit-is-libero" name="isLibero" type="checkbox"
+            class="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-700" />
+          <span class="text-sm text-slate-700">リベロとして登録</span>
+        </label>
+        <p id="edit-error-msg" class="hidden text-sm text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2"></p>
+        <div class="flex gap-2 pt-1">
+          <button type="button" id="edit-cancel-btn" class="flex-1 btn-secondary py-2.5">キャンセル</button>
+          <button type="submit" id="edit-submit-btn" class="flex-1 btn-primary py-2.5">保存する</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+</Base>
 
 <script define:vars={{ teamId, inviteCode: team.inviteCode }}>
   document.getElementById('copy-code-btn')?.addEventListener('click', async () => {
