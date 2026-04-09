@@ -246,9 +246,10 @@ export const useMatchStore = create<MatchStore>()(
           currentRotation: snap.currentRotation,
           currentSetNumber: snap.currentSetNumber,
           pendingPoints: snap.pendingPoints as MatchState['pendingPoints'],
-          servingTeam: snap.servingTeam,
-          rotationIndex: snap.rotationIndex,
-          liberoSubstitutedFor: snap.liberoSubstitutedFor,
+          // 旧スナップショット（LocalStorage上の古いデータ）はこれらのフィールドを持たない可能性があるためフォールバックを設定
+          servingTeam: snap.servingTeam ?? 'home',
+          rotationIndex: snap.rotationIndex ?? 0,
+          liberoSubstitutedFor: snap.liberoSubstitutedFor ?? null,
           eventHistory: state.eventHistory.slice(0, -1),
           isSynced: false,
         })
@@ -261,6 +262,19 @@ export const useMatchStore = create<MatchStore>()(
         // FIVBルール: 負けたチームが次セット最初にサーブ
         const nextServingTeam: 'home' | 'away' =
           winner === 'home' ? 'away' : 'home'
+
+        // セット終了時にリベロがコートにいる場合は元の選手に戻す
+        let finalRotation = state.currentRotation
+        if (
+          state.liberoId &&
+          state.liberoSubstitutedFor &&
+          finalRotation.includes(state.liberoId)
+        ) {
+          finalRotation = finalRotation.map((id) =>
+            id === state.liberoId ? state.liberoSubstitutedFor! : id
+          )
+        }
+
         const snapshot = makeSnapshot(state)
         const event: GameEvent = {
           type: 'set_end',
@@ -276,6 +290,7 @@ export const useMatchStore = create<MatchStore>()(
           homeScore: 0,
           awayScore: 0,
           currentSetNumber: s.currentSetNumber + 1,
+          currentRotation: finalRotation,
           servingTeam: nextServingTeam,
           rotationIndex: 0,
           liberoSubstitutedFor: null,

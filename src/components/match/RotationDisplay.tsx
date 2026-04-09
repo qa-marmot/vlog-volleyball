@@ -162,7 +162,9 @@ export function RotationDisplay({
                   退く選手を選択
                 </div>
                 <div className="flex flex-wrap gap-1 justify-center">
-                  {rotation.map((id) => {
+                  {rotation
+                    .filter((id) => id !== liberoId) // リベロは専用UIで交代
+                    .map((id) => {
                     const p = playerMap.get(id)
                     if (!p) return null
                     return (

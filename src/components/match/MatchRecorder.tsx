@@ -316,7 +316,10 @@ export function MatchRecorder({
       <div className="flex items-center justify-between">
         <UndoButton
           onUndo={store.undoLastPoint}
-          disabled={store.eventHistory.length === 0}
+          disabled={
+            store.eventHistory.length === 0 ||
+            store.eventHistory[store.eventHistory.length - 1].type !== 'point'
+          }
         />
         {store.detailLogEnabled && (
           <span className="text-xs font-medium text-green-600 flex items-center gap-1">
