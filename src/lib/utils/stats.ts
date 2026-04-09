@@ -153,13 +153,31 @@ export function computeStats(
 
 export function computeTimelineWithSets(
   points: Point[],
-  sets: { id: string; set_number: number }[]
+  sets: { id: string; set_number: number; home_score: number; away_score: number; completed: boolean }[]
 ): ScoreTimelinePoint[] {
   const setMap = new Map(sets.map((s) => [s.id, s.set_number]))
-  return points.map((p) => ({
-    pointNumber: p.point_number,
-    homeScore: p.home_score,
-    awayScore: p.away_score,
-    setNumber: setMap.get(p.set_id) ?? 1,
-  }))
+
+  // セットごとの累積オフセットを計算（前セットの最終スコアを加算）
+  const sortedSets = [...sets].sort((a, b) => a.set_number - b.set_number)
+  const setOffsets = new Map<number, { home: number; away: number }>()
+  let cumulativeHome = 0
+  let cumulativeAway = 0
+  for (const s of sortedSets) {
+    setOffsets.set(s.set_number, { home: cumulativeHome, away: cumulativeAway })
+    if (s.completed) {
+      cumulativeHome += s.home_score
+      cumulativeAway += s.away_score
+    }
+  }
+
+  return points.map((p) => {
+    const setNumber = setMap.get(p.set_id) ?? 1
+    const offset = setOffsets.get(setNumber) ?? { home: 0, away: 0 }
+    return {
+      pointNumber: p.point_number,
+      homeScore: p.home_score + offset.home,
+      awayScore: p.away_score + offset.away,
+      setNumber,
+    }
+  })
 }

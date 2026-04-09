@@ -78,7 +78,7 @@ matchesRoute.put('/:matchId', async (c) => {
     detailLogStartPoint?: number
     sets?: Array<{ setNumber: number; homeScore: number; awayScore: number; winner?: string; completed?: boolean }>
     points?: Array<{
-      setNumber: number; pointNumber: number; scorer: string
+      id?: string; setNumber: number; pointNumber: number; scorer: string
       homeScore: number; awayScore: number; rotationIndex: number
       actionType?: string; playerId?: string; isDetailLogged: boolean; createdAt: string
     }>
@@ -125,7 +125,7 @@ matchesRoute.put('/:matchId', async (c) => {
       const setId = setMap.get(p.setNumber)
       if (!setId) continue
       await db.insert(points).values({
-        id: crypto.randomUUID(), matchId, setId,
+        id: p.id ?? crypto.randomUUID(), matchId, setId,
         pointNumber: p.pointNumber, scorer: p.scorer as any,
         homeScore: p.homeScore, awayScore: p.awayScore,
         rotationIndex: p.rotationIndex,
@@ -190,7 +190,7 @@ matchesRoute.get('/:matchId/result', async (c) => {
   const stats = computeStats(matchPoints as any, teamPlayers as any, match.detailLogStartPoint)
   stats.scoreTimeline = computeTimelineWithSets(
     matchPoints as any,
-    sets.map((s) => ({ id: s.id, set_number: s.setNumber }))
+    sets.map((s) => ({ id: s.id, set_number: s.setNumber, home_score: s.homeScore, away_score: s.awayScore, completed: s.completed }))
   )
 
   return c.json({ match, sets, players: teamPlayers, stats })
@@ -210,7 +210,7 @@ matchesRoute.get('/share/:uuid', async (c) => {
   const stats = computeStats(matchPoints as any, teamPlayers as any, match.detailLogStartPoint)
   stats.scoreTimeline = computeTimelineWithSets(
     matchPoints as any,
-    sets.map((s) => ({ id: s.id, set_number: s.setNumber }))
+    sets.map((s) => ({ id: s.id, set_number: s.setNumber, home_score: s.homeScore, away_score: s.awayScore, completed: s.completed }))
   )
 
   return c.json({ match, sets, players: teamPlayers, stats })

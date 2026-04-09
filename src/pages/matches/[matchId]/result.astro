@@ -64,7 +64,7 @@ const playersForClient: Player[] = dbPlayers.map((p) => ({
 const stats = computeStats(pointsForUtils, playersForClient, match.detailLogStartPoint)
 stats.scoreTimeline = computeTimelineWithSets(
   pointsForUtils,
-  dbSets.map((s) => ({ id: s.id, set_number: s.setNumber }))
+  dbSets.map((s) => ({ id: s.id, set_number: s.setNumber, home_score: s.homeScore, away_score: s.awayScore, completed: s.completed }))
 )
 ---
 <Base title="試合結果">
