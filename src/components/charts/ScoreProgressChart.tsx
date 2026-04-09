@@ -78,16 +78,16 @@ export function ScoreProgressChart({
           <Line
             type="monotone"
             dataKey="homeScore"
-            stroke="hsl(var(--primary))"
-            strokeWidth={2}
+            stroke="#1d4ed8"
+            strokeWidth={2.5}
             dot={false}
             activeDot={{ r: 4 }}
           />
           <Line
             type="monotone"
             dataKey="awayScore"
-            stroke="hsl(var(--destructive))"
-            strokeWidth={2}
+            stroke="#dc2626"
+            strokeWidth={2.5}
             dot={false}
             activeDot={{ r: 4 }}
           />

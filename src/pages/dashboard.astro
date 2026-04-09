@@ -51,16 +51,26 @@ const recentMatches = teamIds.length > 0
         {memberships.length > 0 ? (
           <div class="card divide-y divide-slate-100">
             {memberships.map(({ role, team }) => (
-              <a href={`/teams/${team.id}`}
-                class="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors">
-                <span class="text-sm font-medium text-slate-800">{team.name}</span>
-                <div class="flex items-center gap-2">
-                  <span class="font-mono text-xs text-slate-400">{team.inviteCode}</span>
-                  <span class={role === 'owner' ? 'badge-owner' : 'badge-member'}>
-                    {role === 'owner' ? 'オーナー' : 'メンバー'}
-                  </span>
-                </div>
-              </a>
+              <div class="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors">
+                <a href={`/teams/${team.id}`} class="flex-1 min-w-0 mr-3">
+                  <span class="text-sm font-medium text-slate-800 block truncate">{team.name}</span>
+                  <div class="flex items-center gap-2 mt-0.5">
+                    <span class="font-mono text-xs text-slate-400">{team.inviteCode}</span>
+                    <span class={role === 'owner' ? 'badge-owner' : 'badge-member'}>
+                      {role === 'owner' ? 'オーナー' : 'メンバー'}
+                    </span>
+                  </div>
+                </a>
+                {role === 'owner' && (
+                  <button
+                    data-team-id={team.id}
+                    data-team-name={team.name}
+                    class="delete-team-btn text-xs text-slate-300 hover:text-red-500 transition-colors px-2 py-1 shrink-0"
+                  >
+                    削除
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         ) : (
@@ -83,23 +93,35 @@ const recentMatches = teamIds.length > 0
         {recentMatches.length > 0 ? (
           <div class="card divide-y divide-slate-100">
             {recentMatches.map((match) => {
-              const teamName = memberships.find(m => m.team.id === match.teamId)?.team.name ?? ''
+              const membership = memberships.find(m => m.team.id === match.teamId)
+              const teamName = membership?.team.name ?? ''
+              const isOwner = membership?.role === 'owner'
               const href = match.status === 'in_progress'
                 ? `/matches/${match.id}/record`
                 : `/matches/${match.id}/result`
               return (
-                <a href={href}
-                  class="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors">
-                  <div>
-                    <div class="text-sm font-medium text-slate-800">
+                <div class="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors">
+                  <a href={href} class="flex-1 min-w-0 mr-3">
+                    <div class="text-sm font-medium text-slate-800 truncate">
                       {teamName} <span class="text-slate-400 font-normal">vs</span> {match.opponentName}
                     </div>
                     <div class="text-xs text-slate-400 mt-0.5">{match.matchDate}</div>
+                  </a>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <span class={match.status === 'completed' ? 'badge-done' : 'badge-active'}>
+                      {match.status === 'completed' ? '終了' : '● 進行中'}
+                    </span>
+                    {isOwner && (
+                      <button
+                        data-match-id={match.id}
+                        data-match-name={`${teamName} vs ${match.opponentName}`}
+                        class="delete-match-btn text-xs text-slate-300 hover:text-red-500 transition-colors px-2 py-1"
+                      >
+                        削除
+                      </button>
+                    )}
                   </div>
-                  <span class={match.status === 'completed' ? 'badge-done' : 'badge-active'}>
-                    {match.status === 'completed' ? '終了' : '● 進行中'}
-                  </span>
-                </a>
+                </div>
               )
             })}
           </div>
@@ -120,5 +142,27 @@ const recentMatches = teamIds.length > 0
   document.getElementById('logout-btn')?.addEventListener('click', async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     location.href = '/login'
+  })
+
+  document.querySelectorAll('.delete-team-btn').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation()
+      const el = e.currentTarget as HTMLElement
+      if (!confirm(`「${el.dataset.teamName}」を削除しますか？\nチームの選手・試合記録がすべて削除されます。`)) return
+      const res = await fetch(`/api/teams/${el.dataset.teamId}`, { method: 'DELETE' })
+      if (res.ok) location.reload()
+      else alert('削除に失敗しました')
+    })
+  })
+
+  document.querySelectorAll('.delete-match-btn').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation()
+      const el = e.currentTarget as HTMLElement
+      if (!confirm(`「${el.dataset.matchName}」を削除しますか？`)) return
+      const res = await fetch(`/api/matches/${el.dataset.matchId}`, { method: 'DELETE' })
+      if (res.ok) location.reload()
+      else alert('削除に失敗しました')
+    })
   })
 </script>

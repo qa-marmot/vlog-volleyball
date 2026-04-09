@@ -56,18 +56,18 @@ export function DetailLogModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
-      <DialogContent className="max-w-xs">
+      <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg">
             {scorer === 'home' ? '自チームの得点' : '相手チームの得点'}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           {/* アクション選択 */}
           <div>
-            <div className="text-sm text-muted-foreground mb-2">得点の種類</div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="text-sm font-medium text-slate-600 mb-3">得点の種類を選択</div>
+            <div className="grid grid-cols-2 gap-3">
               {ACTIONS.map((action) => (
                 <button
                   key={action.value}
@@ -75,14 +75,14 @@ export function DetailLogModal({
                     setSelectedAction(action.value)
                     if (action.value === 'opponent_error') setSelectedPlayer(null)
                   }}
-                  className={`rounded-xl border p-3 text-center transition-colors
+                  className={`rounded-xl border-2 py-4 px-3 text-center transition-colors active:scale-95
                     ${selectedAction === action.value
                       ? 'bg-primary text-primary-foreground border-primary'
-                      : 'hover:bg-muted/50'
+                      : 'border-border hover:bg-muted/50'
                     }`}
                 >
-                  <div className="text-2xl">{action.icon}</div>
-                  <div className="text-sm font-medium mt-1">{action.label}</div>
+                  <div className="text-3xl">{action.icon}</div>
+                  <div className="text-sm font-semibold mt-2">{action.label}</div>
                 </button>
               ))}
             </div>
@@ -91,34 +91,38 @@ export function DetailLogModal({
           {/* 選手選択（自チームかつ相手ミス以外） */}
           {showPlayerSelect && (
             <div>
-              <div className="text-sm text-muted-foreground mb-2">得点した選手</div>
-              <div className="flex flex-wrap gap-2">
+              <div className="text-sm font-medium text-slate-600 mb-3">得点した選手</div>
+              <div className="grid grid-cols-2 gap-2">
                 {homePlayers.filter((p) => !p.is_libero).map((p) => (
-                  <Badge
+                  <button
                     key={p.id}
-                    variant={selectedPlayer === p.id ? 'default' : 'outline'}
-                    className="cursor-pointer py-1 px-3"
                     onClick={() => setSelectedPlayer(p.id)}
+                    className={`rounded-xl border-2 py-3 px-3 text-sm font-semibold transition-colors active:scale-95 min-h-[52px]
+                      ${selectedPlayer === p.id
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'border-border hover:bg-muted/50'
+                      }`}
                   >
-                    #{p.number} {p.name}
-                  </Badge>
+                    <span className="block text-xs opacity-70">#{p.number}</span>
+                    {p.name}
+                  </button>
                 ))}
               </div>
             </div>
           )}
 
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-3 pt-1">
             <Button
               variant="outline"
               onClick={handleSkip}
-              className="flex-1"
+              className="flex-1 h-12 text-base"
             >
               スキップ
             </Button>
             <Button
               onClick={handleConfirm}
               disabled={!selectedAction}
-              className="flex-1"
+              className="flex-1 h-12 text-base"
             >
               記録する
             </Button>
