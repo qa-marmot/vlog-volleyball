@@ -29,12 +29,12 @@ export function RotationDisplay({
 
   const playerMap = new Map(players.map((p) => [p.id, p]))
 
-  // コート表示レイアウト
+  // コート表示レイアウト（上がネット側）
   // rotation[0]=後衛右(サーバー), [1]=後衛中, [2]=後衛左
   // rotation[3]=前衛左, [4]=前衛中, [5]=前衛右
   const layout = [
-    [rotation[3], rotation[4], rotation[5]], // 前衛（上段）
-    [rotation[0], rotation[1], rotation[2]], // 後衛（下段）
+    [rotation[3], rotation[4], rotation[5]], // 前衛（上段）: 左・中・右
+    [rotation[2], rotation[1], rotation[0]], // 後衛（下段）: 左・中・右
   ]
 
   function getPlayerLabel(id: string) {
@@ -77,12 +77,18 @@ export function RotationDisplay({
 
       {/* コートレイアウト */}
       <div className="space-y-1">
+        {/* ネット */}
+        <div className="flex items-center gap-2 px-1 mb-1">
+          <div className="flex-1 border-t-[3px] border-double border-slate-400" />
+          <span className="text-[10px] text-slate-500 font-semibold tracking-wide">ネット</span>
+          <div className="flex-1 border-t-[3px] border-double border-slate-400" />
+        </div>
         {layout.map((row, rowIdx) => (
           <div key={rowIdx} className="flex gap-1 justify-center">
             {row.map((playerId, colIdx) => {
               const isLib = playerId === liberoId
-              // サーバー位置: 後衛行(rowIdx=1)の右端(colIdx=0)
-              const isServer = rowIdx === 1 && colIdx === 0
+              // サーバー位置: 後衛行(rowIdx=1)の右端(colIdx=2)
+              const isServer = rowIdx === 1 && colIdx === 2
               return (
                 <div
                   key={colIdx}
@@ -107,7 +113,6 @@ export function RotationDisplay({
           </div>
         ))}
       </div>
-      <div className="text-[10px] text-center text-muted-foreground mt-1">▲ネット側</div>
 
       {/* リベロ交代 */}
       {liberoId && onLiberoSub && (
