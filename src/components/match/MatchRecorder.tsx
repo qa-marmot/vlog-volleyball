@@ -348,7 +348,7 @@ export function MatchRecorder({
 
   // --- Recording screen ---
   // セット終了リマインダー判定
-  const setEndTarget = store.currentSetNumber >= 5 ? 15 : 25
+  const setEndTarget = store.currentSetNumber >= 3 ? 15 : 21
   const maxScore = Math.max(store.homeScore, store.awayScore)
   const scoreDiff = Math.abs(store.homeScore - store.awayScore)
   const shouldEndSet = maxScore >= setEndTarget && scoreDiff >= 2
