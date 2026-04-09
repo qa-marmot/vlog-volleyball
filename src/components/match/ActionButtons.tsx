@@ -107,23 +107,24 @@ export function ActionButtons({
 
       {/* タイムアウト選択ダイアログ */}
       <Dialog open={showTimeoutMenu} onOpenChange={setShowTimeoutMenu}>
-        <DialogContent className="max-w-xs">
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>タイムアウト</DialogTitle>
+            <DialogTitle className="text-lg">タイムアウト</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-2 py-2">
+          <p className="text-sm text-muted-foreground -mt-2">どちらのチームのタイムアウトですか？</p>
+          <div className="flex flex-col gap-3 py-2">
             <Button
               onClick={() => { setShowTimeoutMenu(false); onTimeout('home') }}
-              className="h-12"
+              className="h-14 text-base"
             >
-              {teamName} のタイムアウト
+              {teamName}
             </Button>
             <Button
               variant="outline"
               onClick={() => { setShowTimeoutMenu(false); onTimeout('away') }}
-              className="h-12"
+              className="h-14 text-base"
             >
-              {opponentName} のタイムアウト
+              {opponentName}
             </Button>
           </div>
         </DialogContent>

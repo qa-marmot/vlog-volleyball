@@ -65,6 +65,22 @@ teamsRoute.get('/:teamId', async (c) => {
   return c.json({ team, players: teamPlayers, role: membership.role })
 })
 
+// チーム削除（オーナーのみ）
+teamsRoute.delete('/:teamId', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.json({ error: '認証が必要です' }, 401)
+
+  const { teamId } = c.req.param()
+  const db = getDb(c.env.DB)
+
+  const membership = await db.select().from(teamMembers)
+    .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, user.id))).get()
+  if (!membership || membership.role !== 'owner') return c.json({ error: '権限がありません' }, 403)
+
+  await db.delete(teams).where(eq(teams.id, teamId))
+  return c.json({ ok: true })
+})
+
 // 選手追加
 teamsRoute.post('/:teamId/players', async (c) => {
   const user = c.get('user')

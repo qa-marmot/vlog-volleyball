@@ -154,6 +154,24 @@ matchesRoute.put('/:matchId', async (c) => {
   return c.json({ ok: true })
 })
 
+// 試合削除（オーナーのみ）
+matchesRoute.delete('/:matchId', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.json({ error: '認証が必要です' }, 401)
+
+  const { matchId } = c.req.param()
+  const db = getDb(c.env.DB)
+  const match = await db.select().from(matches).where(eq(matches.id, matchId)).get()
+  if (!match) return c.json({ error: '試合が見つかりません' }, 404)
+
+  const membership = await assertMember(db, match.teamId, user.id)
+  if (!membership) return c.json({ error: '権限がありません' }, 403)
+  if (membership.role !== 'owner') return c.json({ error: 'オーナーのみ削除できます' }, 403)
+
+  await db.delete(matches).where(eq(matches.id, matchId))
+  return c.json({ ok: true })
+})
+
 // 試合結果取得（分析データ含む）
 matchesRoute.get('/:matchId/result', async (c) => {
   const user = c.get('user')
