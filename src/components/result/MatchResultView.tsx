@@ -3,8 +3,12 @@
 import { SetScoreSummary } from './SetScoreSummary'
 import { PlayerStatsTable } from './PlayerStatsTable'
 import { RotationAnalysis } from './RotationAnalysis'
+import { RunAnalysis } from './RunAnalysis'
+import { PhaseAnalysis } from './PhaseAnalysis'
+import { ActionBreakdownChart } from './ActionBreakdownChart'
 import { SharePanel } from './SharePanel'
 import { ScoreProgressChart } from '@/components/charts/ScoreProgressChart'
+import { ScoreDiffChart } from '@/components/charts/ScoreDiffChart'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import type { MatchStats, MatchSet } from '@/types'
@@ -58,7 +62,7 @@ export function MatchResultView({
         </div>
       )}
 
-      {/* 点数推移チャート（Phase 3） */}
+      {/* 点数推移チャート */}
       {stats.scoreTimeline.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
@@ -74,9 +78,60 @@ export function MatchResultView({
         </Card>
       )}
 
-      {/* 詳細分析（Phase 2）: ログあり50%以上のみ表示 */}
+      {/* 得点差推移チャート */}
+      {stats.scoreTimeline.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">得点差推移</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScoreDiffChart
+              timeline={stats.scoreTimeline}
+              teamName={teamName}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 連続得点ラン */}
+      {stats.scoreTimeline.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">最長連続得点・失点</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RunAnalysis runStats={stats.runStats} teamName={teamName} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 得点帯別・接戦局面 */}
+      {stats.scoreTimeline.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">フェーズ別・接戦勝率</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PhaseAnalysis
+              phaseStats={stats.phaseStats}
+              closeGameStats={stats.closeGameStats}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 詳細分析: ログあり50%以上のみ表示 */}
       {stats.hasDetailLog && (
         <>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">得点内訳</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ActionBreakdownChart breakdown={stats.actionBreakdown} />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">得点ランキング</CardTitle>

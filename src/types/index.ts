@@ -129,6 +129,7 @@ export interface PlayerStat {
   servePoints: number
   blockPoints: number
   opponentErrors: number
+  contributionRate: number
 }
 
 export interface RotationStat {
@@ -137,6 +138,32 @@ export interface RotationStat {
   homePoints: number
   awayPoints: number
   pointDiff: number
+  winRate: number
+}
+
+export interface RunStats {
+  maxHomeRun: number
+  maxAwayRun: number
+}
+
+export interface PhaseStat {
+  phase: '序盤' | '中盤' | '終盤'
+  homePoints: number
+  awayPoints: number
+  winRate: number
+}
+
+export interface CloseGameStats {
+  totalPoints: number
+  homeWins: number
+  winRate: number
+}
+
+export interface ActionBreakdown {
+  attack: number
+  serve: number
+  block: number
+  opponentError: number
 }
 
 export interface MatchStats {
@@ -145,6 +172,10 @@ export interface MatchStats {
   playerStats: PlayerStat[]
   rotationStats: RotationStat[]
   scoreTimeline: ScoreTimelinePoint[]
+  runStats: RunStats
+  phaseStats: PhaseStat[]
+  closeGameStats: CloseGameStats
+  actionBreakdown: ActionBreakdown
 }
 
 export interface ScoreTimelinePoint {

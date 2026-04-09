@@ -47,6 +47,11 @@ export function RotationAnalysis({ rotationStats }: RotationAnalysisProps) {
               }`}>
                 {diff > 0 ? `+${diff}` : diff}
               </span>
+              <span className={`w-9 text-right text-[10px] ${
+                stat.winRate >= 0.5 ? 'text-primary' : 'text-destructive'
+              }`}>
+                {Math.round(stat.winRate * 100)}%
+              </span>
             </div>
           </div>
         )
