@@ -275,24 +275,30 @@ export function MatchRecorder({
         onTimeout={store.addTimeout}
       />
 
-      {/* Undo + detail log toggle */}
+      {/* Undo + detail log status */}
       <div className="flex items-center justify-between">
         <UndoButton
           onUndo={store.undoLastPoint}
           disabled={store.eventHistory.length === 0}
         />
-        {!store.detailLogEnabled && (
-          <button
-            onClick={store.enableDetailLog}
-            className="text-xs text-blue-600 underline"
-          >
-            詳細ログを開始
-          </button>
-        )}
         {store.detailLogEnabled && (
-          <span className="text-xs text-green-600">詳細ログ記録中</span>
+          <span className="text-xs font-medium text-green-600 flex items-center gap-1">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500"></span>
+            詳細ログ記録中
+          </span>
         )}
       </div>
+
+      {/* Detail log start button */}
+      {!store.detailLogEnabled && (
+        <button
+          onClick={store.enableDetailLog}
+          className="w-full rounded-xl border-2 border-dashed border-blue-200 bg-blue-50 px-4 py-4 text-left hover:bg-blue-100 transition-colors"
+        >
+          <span className="block text-sm font-semibold text-blue-700">詳細ログを開始する</span>
+          <span className="block text-xs text-blue-500 mt-0.5">得点の種類（アタック・サーブ・ブロック等）と選手を記録してスタッツを集計</span>
+        </button>
+      )}
 
       {/* End match */}
       <div className="pt-2 border-t">
