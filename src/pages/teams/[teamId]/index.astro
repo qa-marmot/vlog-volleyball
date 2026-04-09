@@ -75,21 +75,21 @@ const positionFull: Record<string, string> = {
                 <div class="flex items-center gap-2">
                   {p.isLibero && <span class="badge-libero">リベロ</span>}
                   {isOwner && (
-                    <>
-                      <button
-                        data-player-id={p.id}
-                        data-player-name={p.name}
-                        data-player-number={p.number}
-                        data-player-position={p.position ?? ''}
-                        data-player-libero={p.isLibero ? '1' : '0'}
-                        class="edit-player-btn text-xs text-slate-400 hover:text-blue-500 transition-colors px-1">
-                        編集
-                      </button>
-                      <button data-player-id={p.id} data-player-name={p.name}
-                        class="delete-player-btn text-xs text-slate-300 hover:text-red-500 transition-colors px-1">
-                        削除
-                      </button>
-                    </>
+                    <button
+                      data-player-id={p.id}
+                      data-player-name={p.name}
+                      data-player-number={p.number}
+                      data-player-position={p.position ?? ''}
+                      data-player-libero={p.isLibero ? '1' : '0'}
+                      class="edit-player-btn text-xs text-slate-400 hover:text-blue-500 transition-colors px-1">
+                      編集
+                    </button>
+                  )}
+                  {isOwner && (
+                    <button data-player-id={p.id} data-player-name={p.name}
+                      class="delete-player-btn text-xs text-slate-300 hover:text-red-500 transition-colors px-1">
+                      削除
+                    </button>
                   )}
                 </div>
               </div>
@@ -203,99 +203,103 @@ const positionFull: Record<string, string> = {
       </form>
     </div>
   </dialog>
-</Base>
 
-<script define:vars={{ teamId, inviteCode: team.inviteCode }}>
-  document.getElementById('copy-code-btn')?.addEventListener('click', async () => {
-    await navigator.clipboard.writeText(inviteCode)
-    const btn = document.getElementById('copy-code-btn')
-    if (btn) {
-      btn.textContent = 'コピー済み'
-      setTimeout(() => { btn.textContent = 'コピー' }, 2000)
+  <script define:vars={{ teamId, inviteCode: team.inviteCode }}>
+    document.getElementById('copy-code-btn')?.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(inviteCode)
+      const btn = document.getElementById('copy-code-btn')
+      if (btn) {
+        btn.textContent = 'コピー済み'
+        setTimeout(() => { btn.textContent = 'コピー' }, 2000)
+      }
+    })
+
+    const editDialog = document.getElementById('edit-player-dialog')
+    const editForm = document.getElementById('edit-player-form')
+    const editIdInput = document.getElementById('edit-player-id')
+    const editNameInput = document.getElementById('edit-name')
+    const editNumberInput = document.getElementById('edit-number')
+    const editPositionSelect = document.getElementById('edit-position')
+    const editIsLiberoCheck = document.getElementById('edit-is-libero')
+    const editErrorMsg = document.getElementById('edit-error-msg')
+    const editSubmitBtn = document.getElementById('edit-submit-btn')
+    const editCancelBtn = document.getElementById('edit-cancel-btn')
+
+    if (editIsLiberoCheck && editPositionSelect) {
+      editIsLiberoCheck.addEventListener('change', () => {
+        if (editIsLiberoCheck.checked) editPositionSelect.value = 'L'
+        else if (editPositionSelect.value === 'L') editPositionSelect.value = ''
+      })
+      editPositionSelect.addEventListener('change', () => {
+        if (editPositionSelect.value === 'L') editIsLiberoCheck.checked = true
+        else editIsLiberoCheck.checked = false
+      })
     }
-  })
 
-  const editDialog = document.getElementById('edit-player-dialog')
-  const editForm = document.getElementById('edit-player-form')
-  const editIdInput = document.getElementById('edit-player-id')
-  const editNameInput = document.getElementById('edit-name')
-  const editNumberInput = document.getElementById('edit-number')
-  const editPositionSelect = document.getElementById('edit-position')
-  const editIsLiberoCheck = document.getElementById('edit-is-libero')
-  const editErrorMsg = document.getElementById('edit-error-msg')
-  const editSubmitBtn = document.getElementById('edit-submit-btn')
-  const editCancelBtn = document.getElementById('edit-cancel-btn')
+    document.querySelectorAll('.edit-player-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const el = e.currentTarget
+        if (!editDialog || !editIdInput || !editNameInput || !editNumberInput || !editPositionSelect || !editIsLiberoCheck || !editErrorMsg) return
+        editIdInput.value = el.dataset.playerId
+        editNameInput.value = el.dataset.playerName
+        editNumberInput.value = el.dataset.playerNumber
+        editPositionSelect.value = el.dataset.playerPosition ?? ''
+        editIsLiberoCheck.checked = el.dataset.playerLibero === '1'
+        editErrorMsg.classList.add('hidden')
+        editDialog.showModal()
+      })
+    })
 
-  editIsLiberoCheck.addEventListener('change', () => {
-    if (editIsLiberoCheck.checked) editPositionSelect.value = 'L'
-    else if (editPositionSelect.value === 'L') editPositionSelect.value = ''
-  })
-  editPositionSelect.addEventListener('change', () => {
-    if (editPositionSelect.value === 'L') editIsLiberoCheck.checked = true
-    else editIsLiberoCheck.checked = false
-  })
+    editCancelBtn?.addEventListener('click', () => editDialog?.close())
 
-  document.querySelectorAll('.edit-player-btn').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      const el = e.currentTarget
-      editIdInput.value = el.dataset.playerId
-      editNameInput.value = el.dataset.playerName
-      editNumberInput.value = el.dataset.playerNumber
-      editPositionSelect.value = el.dataset.playerPosition ?? ''
-      editIsLiberoCheck.checked = el.dataset.playerLibero === '1'
+    editForm?.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      if (!editSubmitBtn || !editErrorMsg || !editIdInput || !editNameInput || !editNumberInput || !editPositionSelect || !editIsLiberoCheck || !editDialog) return
+      editSubmitBtn.disabled = true
+      editSubmitBtn.textContent = '保存中...'
       editErrorMsg.classList.add('hidden')
-      editDialog.showModal()
+      const playerId = editIdInput.value
+      const res = await fetch(`/api/teams/${teamId}/players/${playerId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editNameInput.value,
+          number: Number(editNumberInput.value),
+          position: editPositionSelect.value || null,
+          isLibero: editIsLiberoCheck.checked,
+        }),
+      })
+      if (res.ok) {
+        editDialog.close()
+        location.reload()
+      } else {
+        const data = await res.json()
+        editErrorMsg.textContent = data.error ?? 'エラーが発生しました'
+        editErrorMsg.classList.remove('hidden')
+        editSubmitBtn.disabled = false
+        editSubmitBtn.textContent = '保存する'
+      }
     })
-  })
 
-  editCancelBtn.addEventListener('click', () => editDialog.close())
-
-  editForm.addEventListener('submit', async (e) => {
-    e.preventDefault()
-    editSubmitBtn.disabled = true
-    editSubmitBtn.textContent = '保存中...'
-    editErrorMsg.classList.add('hidden')
-    const playerId = editIdInput.value
-    const res = await fetch(`/api/teams/${teamId}/players/${playerId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: editNameInput.value,
-        number: Number(editNumberInput.value),
-        position: editPositionSelect.value || null,
-        isLibero: editIsLiberoCheck.checked,
-      }),
+    document.querySelectorAll('.delete-player-btn').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        const el = e.currentTarget
+        if (!confirm(`${el.dataset.playerName} を削除しますか？`)) return
+        const res = await fetch(`/api/teams/${teamId}/players/${el.dataset.playerId}`, { method: 'DELETE' })
+        if (res.ok) location.reload()
+        else alert('削除に失敗しました')
+      })
     })
-    if (res.ok) {
-      editDialog.close()
-      location.reload()
-    } else {
-      const data = await res.json()
-      editErrorMsg.textContent = data.error ?? 'エラーが発生しました'
-      editErrorMsg.classList.remove('hidden')
-      editSubmitBtn.disabled = false
-      editSubmitBtn.textContent = '保存する'
-    }
-  })
 
-  document.querySelectorAll('.delete-player-btn').forEach((btn) => {
-    btn.addEventListener('click', async (e) => {
-      const el = e.currentTarget as HTMLElement
-      if (!confirm(`${el.dataset.playerName} を削除しますか？`)) return
-      const res = await fetch(`/api/teams/${teamId}/players/${el.dataset.playerId}`, { method: 'DELETE' })
-      if (res.ok) location.reload()
-      else alert('削除に失敗しました')
+    document.querySelectorAll('.delete-match-btn').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation()
+        const el = e.currentTarget
+        if (!confirm(`「${el.dataset.matchName}」を削除しますか？`)) return
+        const res = await fetch(`/api/matches/${el.dataset.matchId}`, { method: 'DELETE' })
+        if (res.ok) location.reload()
+        else alert('削除に失敗しました')
+      })
     })
-  })
-
-  document.querySelectorAll('.delete-match-btn').forEach((btn) => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation()
-      const el = e.currentTarget as HTMLElement
-      if (!confirm(`「${el.dataset.matchName}」を削除しますか？`)) return
-      const res = await fetch(`/api/matches/${el.dataset.matchId}`, { method: 'DELETE' })
-      if (res.ok) location.reload()
-      else alert('削除に失敗しました')
-    })
-  })
-</script>
+  </script>
+</Base>
