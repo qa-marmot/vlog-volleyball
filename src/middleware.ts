@@ -3,7 +3,7 @@ import { env } from 'cloudflare:workers'
 import { getDb } from './lib/db'
 import { validateSession, SESSION_COOKIE } from './lib/auth'
 
-const PUBLIC_PATHS = ['/login', '/register', '/share', '/api/auth']
+const PUBLIC_PATHS = ['/login', '/register', '/share', '/api/auth', '/help']
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = new URL(context.request.url)
