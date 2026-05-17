@@ -2,7 +2,7 @@
 import Base from '../../../layouts/Base.astro'
 import { ResultWithToaster } from '../../../components/result/ResultWithToaster'
 import { getDb } from '../../../lib/db'
-import { matches, matchSets, points, players, teamMembers, teams } from '../../../schema'
+import { matches, matchSetStrategyReviews, matchSets, points, players, strategySnapshots, teamMembers, teams } from '../../../schema'
 import { eq, and } from 'drizzle-orm'
 import { computeStats, computeTimelineWithSets } from '../../../lib/utils/stats'
 import type { Player, MatchSet, Point } from '../../../types'
@@ -23,6 +23,9 @@ const team = await db.select().from(teams).where(eq(teams.id, match.teamId)).get
 const dbSets = await db.select().from(matchSets).where(eq(matchSets.matchId, matchId))
 const dbPoints = await db.select().from(points).where(eq(points.matchId, matchId))
 const dbPlayers = await db.select().from(players).where(eq(players.teamId, match.teamId))
+const strategySnapshotRows = await db.select().from(strategySnapshots).where(eq(strategySnapshots.matchId, matchId))
+const strategyReviewRows = await db.select().from(matchSetStrategyReviews).where(eq(matchSetStrategyReviews.matchId, matchId))
+const reviewBySet = new Map(strategyReviewRows.map((review) => [review.setNumber, review]))
 
 // Map to snake_case for React components and utils
 const setsForClient: MatchSet[] = dbSets.map((s) => ({
@@ -85,6 +88,34 @@ stats.scoreTimeline = computeTimelineWithSets(
     </header>
 
     <main class="max-w-2xl mx-auto p-4">
+      {strategySnapshotRows.length > 0 && (
+        <section class="card p-4 mb-4">
+          <h2 class="text-base font-semibold text-slate-900">作戦ボード振り返り</h2>
+          <p class="mt-1 text-xs text-slate-500">作戦内容と結果の因果関係は自動判定しません。実行メモとして残します。</p>
+          <div class="mt-3 space-y-3">
+            {strategySnapshotRows.map((snapshot) => {
+              const review = reviewBySet.get(snapshot.setNumber ?? 0)
+              const parsedReview = review ? JSON.parse(review.postMatchReview) : {}
+              return (
+                <div class="rounded-lg border p-3">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="text-sm font-bold text-slate-800">第{snapshot.setNumber ?? '-'}セット</div>
+                    <div class="text-[11px] text-slate-500">snapshot: {snapshot.id.slice(0, 8)}</div>
+                  </div>
+                  <div class="mt-2 grid gap-2">
+                    <textarea class="field-input review-worked min-h-16" data-set={snapshot.setNumber} data-snapshot={snapshot.id} data-plan={snapshot.strategyPlanId} placeholder="うまくいったこと">{parsedReview.workedWell ?? ''}</textarea>
+                    <textarea class="field-input review-didnot min-h-16" data-set={snapshot.setNumber} data-snapshot={snapshot.id} data-plan={snapshot.strategyPlanId} placeholder="うまくいかなかったこと">{parsedReview.didNotWork ?? ''}</textarea>
+                    <textarea class="field-input review-execution min-h-16" data-set={snapshot.setNumber} data-snapshot={snapshot.id} data-plan={snapshot.strategyPlanId} placeholder="実行メモ">{parsedReview.executionNotes ?? ''}</textarea>
+                    <textarea class="field-input review-next min-h-16" data-set={snapshot.setNumber} data-snapshot={snapshot.id} data-plan={snapshot.strategyPlanId} placeholder="次回調整">{parsedReview.nextAdjustments ?? ''}</textarea>
+                    <textarea class="field-input review-opponent min-h-16" data-set={snapshot.setNumber} data-snapshot={snapshot.id} data-plan={snapshot.strategyPlanId} placeholder="実際の相手傾向">{parsedReview.opponentActualTendencies ?? ''}</textarea>
+                    <button type="button" class="save-strategy-review btn-secondary text-xs py-2" data-set={snapshot.setNumber} data-snapshot={snapshot.id} data-plan={snapshot.strategyPlanId}>振り返りを保存</button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
       <ResultWithToaster
         client:load
         teamName={team?.name ?? '自チーム'}
@@ -99,3 +130,39 @@ stats.scoreTimeline = computeTimelineWithSets(
     </main>
   </div>
 </Base>
+
+<script define:vars={{ matchId }}>
+  function valueFor(selector) {
+    return document.querySelector(selector)?.value ?? ''
+  }
+
+  document.querySelectorAll('.save-strategy-review').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const setNumber = Number(button.dataset.set)
+      const strategySnapshotId = button.dataset.snapshot
+      const strategyPlanId = button.dataset.plan
+      const res = await fetch(`/api/matches/${matchId}/strategy-reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          setNumber,
+          strategySnapshotId,
+          strategyPlanId,
+          postMatchReview: {
+            workedWell: valueFor(`.review-worked[data-set="${setNumber}"]`),
+            didNotWork: valueFor(`.review-didnot[data-set="${setNumber}"]`),
+            executionNotes: valueFor(`.review-execution[data-set="${setNumber}"]`),
+            nextAdjustments: valueFor(`.review-next[data-set="${setNumber}"]`),
+            opponentActualTendencies: valueFor(`.review-opponent[data-set="${setNumber}"]`),
+          },
+          rotationReviews: [],
+        }),
+      })
+      if (res.ok) alert('作戦振り返りを保存しました。')
+      else {
+        const json = await res.json()
+        alert(json.error ?? '作戦振り返りを保存できませんでした。')
+      }
+    })
+  })
+</script>

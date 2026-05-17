@@ -1,0 +1,21 @@
+CREATE TABLE `strategy_plans` (
+	`id` text PRIMARY KEY NOT NULL,
+	`team_id` text NOT NULL,
+	`status` text DEFAULT 'draft' NOT NULL,
+	`name` text NOT NULL,
+	`opponent_name` text,
+	`match_date` text,
+	`set_number` integer,
+	`system_type` text DEFAULT '5-1' NOT NULL,
+	`data` text NOT NULL,
+	`created_by` text NOT NULL,
+	`updated_by` text NOT NULL,
+	`deleted_by` text,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
+	`deleted_at` text,
+	FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`updated_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`deleted_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null
+);

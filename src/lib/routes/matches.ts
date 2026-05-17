@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, inArray } from 'drizzle-orm'
-import { matches, matchSets, points, players, teamMembers, timeouts } from '@/schema'
+import { matches, matchSetStrategyReviews, matchSets, points, players, strategySnapshots, teamMembers, timeouts } from '@/schema'
 import { getDb } from '../db'
 import { computeStats, computeTimelineWithSets } from '../utils/stats'
 import type { HonoEnv } from '../hono'
@@ -194,6 +194,82 @@ matchesRoute.get('/:matchId/result', async (c) => {
   )
 
   return c.json({ match, sets, players: teamPlayers, stats })
+})
+
+matchesRoute.get('/:matchId/strategy-reviews', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.json({ error: '認証が必要です' }, 401)
+
+  const { matchId } = c.req.param()
+  const db = getDb(c.env.DB)
+  const match = await db.select().from(matches).where(eq(matches.id, matchId)).get()
+  if (!match) return c.json({ error: '試合が見つかりません' }, 404)
+  if (!(await assertMember(db, match.teamId, user.id))) return c.json({ error: '権限がありません' }, 403)
+
+  const snapshots = await db.select().from(strategySnapshots).where(eq(strategySnapshots.matchId, matchId))
+  const reviews = await db.select().from(matchSetStrategyReviews).where(eq(matchSetStrategyReviews.matchId, matchId))
+
+  return c.json({ snapshots, reviews })
+})
+
+matchesRoute.post('/:matchId/strategy-reviews', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.json({ error: '認証が必要です' }, 401)
+
+  const { matchId } = c.req.param()
+  const db = getDb(c.env.DB)
+  const match = await db.select().from(matches).where(eq(matches.id, matchId)).get()
+  if (!match) return c.json({ error: '試合が見つかりません' }, 404)
+  if (!(await assertMember(db, match.teamId, user.id))) return c.json({ error: '権限がありません' }, 403)
+
+  const body = await c.req.json<{
+    setNumber: number
+    strategyPlanId?: string | null
+    strategySnapshotId?: string | null
+    postMatchReview: {
+      workedWell?: string
+      didNotWork?: string
+      executionNotes?: string
+      nextAdjustments?: string
+      opponentActualTendencies?: string
+    }
+    rotationReviews?: Array<{ rotationKey: string; note: string }>
+  }>()
+
+  if (!body.setNumber) return c.json({ error: 'setNumberが必要です' }, 400)
+
+  const now = new Date().toISOString()
+  const existing = await db.select().from(matchSetStrategyReviews)
+    .where(and(eq(matchSetStrategyReviews.matchId, matchId), eq(matchSetStrategyReviews.setNumber, body.setNumber))).get()
+
+  const values = {
+    strategyPlanId: body.strategyPlanId || null,
+    strategySnapshotId: body.strategySnapshotId || null,
+    postMatchReview: JSON.stringify({
+      workedWell: body.postMatchReview?.workedWell ?? '',
+      didNotWork: body.postMatchReview?.didNotWork ?? '',
+      executionNotes: body.postMatchReview?.executionNotes ?? '',
+      nextAdjustments: body.postMatchReview?.nextAdjustments ?? '',
+      opponentActualTendencies: body.postMatchReview?.opponentActualTendencies ?? '',
+    }),
+    rotationReviews: JSON.stringify(body.rotationReviews ?? []),
+    updatedAt: now,
+  }
+
+  if (existing) {
+    await db.update(matchSetStrategyReviews).set(values).where(eq(matchSetStrategyReviews.id, existing.id))
+    return c.json({ id: existing.id })
+  }
+
+  const id = crypto.randomUUID()
+  await db.insert(matchSetStrategyReviews).values({
+    id,
+    matchId,
+    setNumber: body.setNumber,
+    ...values,
+    createdAt: now,
+  })
+  return c.json({ id })
 })
 
 // 公開共有用 (認証不要)
