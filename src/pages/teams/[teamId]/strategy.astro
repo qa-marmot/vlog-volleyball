@@ -18,6 +18,7 @@ if (!team) return Astro.redirect('/dashboard')
 
 const teamPlayers = await db.select().from(players).where(eq(players.teamId, teamId))
 const nonLiberoPlayers = teamPlayers.filter((p) => !p.isLibero)
+const liberoPlayers = teamPlayers.filter((p) => p.isLibero || p.position === 'L')
 const plans = await db.select().from(strategyPlans)
   .where(and(eq(strategyPlans.teamId, teamId), isNull(strategyPlans.deletedAt)))
 const explicitStrategyRole = await db.select().from(strategyRoles)
@@ -41,7 +42,7 @@ const roleRows = canManageRoles
 <Base title={`${team.name} 作戦ボード`}>
   <div class="min-h-screen bg-slate-50">
     <header class="app-header px-2 py-2 sticky top-0 z-10">
-      <div class="max-w-3xl mx-auto flex items-center justify-between">
+      <div class="max-w-5xl mx-auto flex items-center justify-between">
         <div class="flex items-center gap-2">
           <a href={`/teams/${teamId}`} class="flex items-center justify-center min-h-[44px] min-w-[44px] px-3 text-slate-300 hover:text-white text-lg font-bold transition-colors rounded-lg hover:bg-white/10">←</a>
           <div>
@@ -53,24 +54,24 @@ const roleRows = canManageRoles
       </div>
     </header>
 
-    <main class="max-w-3xl mx-auto p-4 space-y-5">
+    <main class="max-w-5xl mx-auto p-4 space-y-5">
       <section class="card p-4">
         <h1 class="text-base font-semibold text-slate-900 mb-1">新しい作戦プラン</h1>
-        <p class="text-xs text-slate-500 mb-4">基準ローテとしてR1の6人配置を選びます。リベロは含めません。</p>
+        <p class="text-xs text-slate-500 mb-4">R1の6人配置はリベロ以外から選びます。リベロは別枠で登録し、詳細画面でローテごとの交代を設定します。</p>
 
         {!canEdit ? (
           <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-            作戦プランの作成はownerのみ実行できます。memberは閲覧専用です。
+            作戦プランの作成は作戦ボードの owner / editor のみ実行できます。
           </div>
         ) : nonLiberoPlayers.length >= 6 ? (
           <form id="strategy-create-form" class="space-y-4">
-            <div class="grid gap-3 sm:grid-cols-2">
-              <label class="block">
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label class="block lg:col-span-2">
                 <span class="block text-sm font-medium text-slate-700 mb-1.5">プラン名</span>
                 <input id="strategy-name" class="field-input" required value="第1セット用" />
               </label>
               <label class="block">
-                <span class="block text-sm font-medium text-slate-700 mb-1.5">相手チーム</span>
+                <span class="block text-sm font-medium text-slate-700 mb-1.5">対戦相手</span>
                 <input id="strategy-opponent" class="field-input" placeholder="任意" />
               </label>
               <label class="block">
@@ -91,8 +92,8 @@ const roleRows = canManageRoles
             </div>
 
             <div>
-              <h2 class="text-sm font-semibold text-slate-900 mb-2">R1｜基準ローテ</h2>
-              <div class="grid grid-cols-3 gap-2">
+              <h2 class="text-sm font-semibold text-slate-900 mb-2">R1 基準ローテ</h2>
+              <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {[
                   ['3', 'LF / 前衛左'],
                   ['4', 'CF / 前衛中央'],
@@ -111,6 +112,34 @@ const roleRows = canManageRoles
                     </select>
                   </label>
                 ))}
+              </div>
+            </div>
+
+            <div class="rounded-lg border bg-slate-50 p-3">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 class="text-sm font-semibold text-slate-900">リベロ</h2>
+                  <p class="mt-1 text-xs text-slate-500">作戦で使うリベロを最大2人まで選べます。R1の6人には含めません。</p>
+                </div>
+                <button id="toggle-inline-libero" data-ignore-dirty="true" type="button" class="btn-secondary px-3 py-2 text-xs">リベロを追加</button>
+              </div>
+              <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                {liberoPlayers.length > 0 ? liberoPlayers.map((p) => (
+                  <label class="flex items-center gap-3 rounded-lg border bg-white p-2 text-sm">
+                    <input class="strategy-libero-select h-4 w-4 accent-blue-700" type="checkbox" value={p.id} />
+                    <span class="min-w-0 truncate">#{p.number} {p.name} {p.position ? `(${p.position})` : ''}</span>
+                  </label>
+                )) : (
+                  <p class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 sm:col-span-2">登録済みリベロがいません。必要なら下の追加フォームから登録してください。</p>
+                )}
+              </div>
+              <div id="inline-libero-form" class="mt-3 hidden rounded-lg border bg-white p-3">
+                <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_120px_140px]">
+                  <input id="inline-libero-name" data-ignore-dirty="true" class="field-input text-xs" placeholder="リベロの名前" />
+                  <input id="inline-libero-number" data-ignore-dirty="true" type="number" min="0" max="99" class="field-input text-xs" placeholder="背番号" />
+                  <button id="add-inline-libero" data-ignore-dirty="true" type="button" class="btn-secondary px-3 py-2 text-xs">登録して再読み込み</button>
+                </div>
+                <p id="inline-libero-error" class="mt-2 hidden rounded border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700"></p>
               </div>
             </div>
 
@@ -137,12 +166,12 @@ const roleRows = canManageRoles
                   <div class="min-w-0">
                     <div class="text-sm font-medium text-slate-800 truncate">{plan.name}</div>
                     <div class="text-xs text-slate-400 mt-0.5">
-                      {plan.opponentName ? `vs ${plan.opponentName}` : '相手未設定'}
+                      {plan.opponentName ? `vs ${plan.opponentName}` : '対戦相手未設定'}
                       {plan.setNumber ? ` / 第${plan.setNumber}セット` : ''}
                     </div>
                   </div>
                   <span class={`text-[11px] rounded-full px-2 py-0.5 ${plan.status === 'finalized' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
-                    {plan.status === 'finalized' ? 'finalized' : 'draft'}
+                    {plan.status === 'finalized' ? '確定' : '下書き'}
                   </span>
                 </div>
               </a>
@@ -156,7 +185,7 @@ const roleRows = canManageRoles
       {canManageRoles && (
         <section class="card p-4">
           <h2 class="text-sm font-semibold text-slate-900">作戦ボード権限</h2>
-          <p class="mt-1 text-xs text-slate-500">チームownerは常に作戦ownerです。memberには作戦専用のowner/editor/viewerを設定できます。</p>
+          <p class="mt-1 text-xs text-slate-500">チームownerは常に作戦ownerです。memberには作戦専用の owner / editor / viewer を設定できます。</p>
           <div id="strategy-role-message" class="mt-3 hidden rounded-lg border border-blue-100 bg-blue-50 p-2 text-xs text-blue-800"></div>
           <div class="mt-3 divide-y divide-slate-100 rounded-lg border">
             {roleRows.map((row) => {
@@ -186,6 +215,8 @@ const roleRows = canManageRoles
   const form = document.getElementById('strategy-create-form')
   const error = document.getElementById('create-error')
   const roleMessage = document.getElementById('strategy-role-message')
+  const inlineLiberoForm = document.getElementById('inline-libero-form')
+  const inlineLiberoError = document.getElementById('inline-libero-error')
 
   function showRoleMessage(text, isError = false) {
     if (!roleMessage) return
@@ -193,6 +224,39 @@ const roleRows = canManageRoles
     roleMessage.classList.add(isError ? 'border-red-100' : 'border-blue-100', isError ? 'bg-red-50' : 'bg-blue-50', isError ? 'text-red-800' : 'text-blue-800')
     roleMessage.textContent = text
   }
+
+  document.getElementById('toggle-inline-libero')?.addEventListener('click', () => {
+    inlineLiberoForm?.classList.toggle('hidden')
+  })
+
+  document.getElementById('add-inline-libero')?.addEventListener('click', async () => {
+    const name = document.getElementById('inline-libero-name')?.value.trim()
+    const numberValue = document.getElementById('inline-libero-number')?.value
+    if (inlineLiberoError) inlineLiberoError.classList.add('hidden')
+    if (!name || numberValue === '') {
+      if (inlineLiberoError) {
+        inlineLiberoError.textContent = '名前と背番号を入力してください。'
+        inlineLiberoError.classList.remove('hidden')
+      }
+      return
+    }
+    const res = await fetch(`/api/teams/${teamId}/players`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        number: Number(numberValue),
+        position: 'L',
+        isLibero: true,
+      }),
+    })
+    if (res.ok) location.reload()
+    else if (inlineLiberoError) {
+      const data = await res.json()
+      inlineLiberoError.textContent = data.error ?? 'リベロを登録できませんでした。'
+      inlineLiberoError.classList.remove('hidden')
+    }
+  })
 
   document.querySelectorAll('.strategy-role-select').forEach((select) => {
     select.addEventListener('change', async () => {
@@ -225,6 +289,15 @@ const roleRows = canManageRoles
       return
     }
 
+    const selectedLiberos = [...document.querySelectorAll('.strategy-libero-select:checked')].map((input) => input.value)
+    if (selectedLiberos.length > 2) {
+      if (error) {
+        error.textContent = 'リベロは最大2人まで選べます。'
+        error.classList.remove('hidden')
+      }
+      return
+    }
+
     const setValue = document.getElementById('strategy-set')?.value
     const res = await fetch(`/api/teams/${teamId}/strategies`, {
       method: 'POST',
@@ -235,6 +308,7 @@ const roleRows = canManageRoles
         matchDate: document.getElementById('strategy-date')?.value,
         setNumber: setValue ? Number(setValue) : null,
         baseRotation,
+        liberoPlayerIds: selectedLiberos,
       }),
     })
 

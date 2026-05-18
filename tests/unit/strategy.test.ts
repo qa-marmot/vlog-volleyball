@@ -56,6 +56,20 @@ describe('generateRotationsFromBase', () => {
 })
 
 describe('validateStrategyPlanData', () => {
+  it('作戦作成時に選択したリベロを優先する', () => {
+    const plan = buildDefaultStrategyPlanData({
+      name: '第1セット用',
+      baseRotation,
+      players: [
+        ...players,
+        { id: 'p8', position: 'L', isLibero: true },
+      ],
+      liberoPlayerIds: ['p8'],
+    })
+
+    expect(plan.liberoPlayerIds).toEqual(['p8'])
+  })
+
   it('draftでは開始ローテ未設定と開始サーブ未定をwarningにする', () => {
     const result = validateStrategyPlanData(makePlan(), 'draft')
 
