@@ -5,6 +5,7 @@ import { validateSession } from './auth'
 import authRoute from './routes/auth'
 import teamsRoute from './routes/teams'
 import matchesRoute from './routes/matches'
+import strategiesRoute from './routes/strategies'
 
 export type HonoEnv = {
   Bindings: { DB: D1Database }
@@ -28,6 +29,7 @@ app.use('*', async (c, next) => {
 })
 
 app.route('/api/auth', authRoute)
+app.route('/api/teams/:teamId/strategies', strategiesRoute)
 app.route('/api/teams', teamsRoute)
 app.route('/api/matches', matchesRoute)
 

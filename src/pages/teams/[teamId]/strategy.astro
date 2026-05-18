@@ -1,0 +1,185 @@
+---
+import Base from '../../../layouts/Base.astro'
+import { env } from 'cloudflare:workers'
+import { and, eq, isNull } from 'drizzle-orm'
+import { getDb } from '../../../lib/db'
+import { players, strategyPlans, teamMembers, teams } from '../../../schema'
+
+const user = Astro.locals.user!
+const { teamId } = Astro.params as { teamId: string }
+const db = getDb(env.DB)
+
+const membership = await db.select().from(teamMembers)
+  .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, user.id))).get()
+if (!membership) return Astro.redirect('/dashboard')
+
+const team = await db.select().from(teams).where(eq(teams.id, teamId)).get()
+if (!team) return Astro.redirect('/dashboard')
+
+const teamPlayers = await db.select().from(players).where(eq(players.teamId, teamId))
+const nonLiberoPlayers = teamPlayers.filter((p) => !p.isLibero)
+const plans = await db.select().from(strategyPlans)
+  .where(and(eq(strategyPlans.teamId, teamId), isNull(strategyPlans.deletedAt)))
+const canEdit = membership.role === 'owner'
+---
+<Base title={`${team.name} 作戦ボード`}>
+  <div class="min-h-screen bg-slate-50">
+    <header class="app-header px-2 py-2 sticky top-0 z-10">
+      <div class="max-w-3xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <a href={`/teams/${teamId}`} class="flex items-center justify-center min-h-[44px] min-w-[44px] px-3 text-slate-300 hover:text-white text-lg font-bold transition-colors rounded-lg hover:bg-white/10">←</a>
+          <div>
+            <div class="text-sm font-semibold text-white">ローテーション作戦ボード</div>
+            <div class="text-xs text-slate-400">{team.name}</div>
+          </div>
+        </div>
+        <span class="text-[11px] text-slate-300">1プラン = 1セット</span>
+      </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto p-4 space-y-5">
+      <section class="card p-4">
+        <h1 class="text-base font-semibold text-slate-900 mb-1">新しい作戦プラン</h1>
+        <p class="text-xs text-slate-500 mb-4">基準ローテとしてR1の6人配置を選びます。リベロは含めません。</p>
+
+        {!canEdit ? (
+          <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+            作戦プランの作成はownerのみ実行できます。memberは閲覧専用です。
+          </div>
+        ) : nonLiberoPlayers.length >= 6 ? (
+          <form id="strategy-create-form" class="space-y-4">
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label class="block">
+                <span class="block text-sm font-medium text-slate-700 mb-1.5">プラン名</span>
+                <input id="strategy-name" class="field-input" required value="第1セット用" />
+              </label>
+              <label class="block">
+                <span class="block text-sm font-medium text-slate-700 mb-1.5">相手チーム</span>
+                <input id="strategy-opponent" class="field-input" placeholder="任意" />
+              </label>
+              <label class="block">
+                <span class="block text-sm font-medium text-slate-700 mb-1.5">試合日</span>
+                <input id="strategy-date" type="date" class="field-input" />
+              </label>
+              <label class="block">
+                <span class="block text-sm font-medium text-slate-700 mb-1.5">セット番号</span>
+                <select id="strategy-set" class="field-input">
+                  <option value="">未設定</option>
+                  <option value="1">第1セット</option>
+                  <option value="2">第2セット</option>
+                  <option value="3">第3セット</option>
+                  <option value="4">第4セット</option>
+                  <option value="5">第5セット</option>
+                </select>
+              </label>
+            </div>
+
+            <div>
+              <h2 class="text-sm font-semibold text-slate-900 mb-2">R1｜基準ローテ</h2>
+              <div class="grid grid-cols-3 gap-2">
+                {[
+                  ['3', 'LF / 前衛左'],
+                  ['4', 'CF / 前衛中央'],
+                  ['5', 'RF / 前衛右'],
+                  ['2', 'LB / 後衛左'],
+                  ['1', 'CB / 後衛中央'],
+                  ['0', 'RB / サーバー位置'],
+                ].map(([slot, label]) => (
+                  <label class="block rounded-lg border bg-white p-2">
+                    <span class="block text-[11px] font-semibold text-slate-500 mb-1">{label}</span>
+                    <select class="field-input text-xs base-rotation-select" data-slot={slot} required>
+                      <option value="">選択</option>
+                      {nonLiberoPlayers.map((p) => (
+                        <option value={p.id}>#{p.number} {p.name} {p.position ? `(${p.position})` : ''}</option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <p id="create-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2"></p>
+            <button class="btn-primary w-full py-2.5" type="submit">作戦プランを作成</button>
+          </form>
+        ) : (
+          <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            作戦プラン作成には、リベロ以外の選手が6人以上必要です。
+          </div>
+        )}
+      </section>
+
+      <section>
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-sm font-semibold text-slate-900">作戦プラン一覧</h2>
+          <span class="text-xs text-slate-400">{plans.length}件</span>
+        </div>
+        {plans.length > 0 ? (
+          <div class="card divide-y divide-slate-100">
+            {plans.map((plan) => (
+              <a href={`/teams/${teamId}/strategy/${plan.id}`} class="block px-4 py-3 hover:bg-slate-50 transition-colors">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-sm font-medium text-slate-800 truncate">{plan.name}</div>
+                    <div class="text-xs text-slate-400 mt-0.5">
+                      {plan.opponentName ? `vs ${plan.opponentName}` : '相手未設定'}
+                      {plan.setNumber ? ` / 第${plan.setNumber}セット` : ''}
+                    </div>
+                  </div>
+                  <span class={`text-[11px] rounded-full px-2 py-0.5 ${plan.status === 'finalized' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                    {plan.status === 'finalized' ? 'finalized' : 'draft'}
+                  </span>
+                </div>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div class="card px-4 py-6 text-center text-sm text-slate-500">作戦プランはまだありません。</div>
+        )}
+      </section>
+    </main>
+  </div>
+</Base>
+
+<script define:vars={{ teamId }}>
+  const form = document.getElementById('strategy-create-form')
+  const error = document.getElementById('create-error')
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    error?.classList.add('hidden')
+
+    const baseRotation = Array(6).fill('')
+    document.querySelectorAll('.base-rotation-select').forEach((select) => {
+      baseRotation[Number(select.dataset.slot)] = select.value
+    })
+
+    if (new Set(baseRotation).size !== 6 || baseRotation.some((id) => !id)) {
+      if (error) {
+        error.textContent = 'R1には重複しない6人を選んでください。'
+        error.classList.remove('hidden')
+      }
+      return
+    }
+
+    const setValue = document.getElementById('strategy-set')?.value
+    const res = await fetch(`/api/teams/${teamId}/strategies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: document.getElementById('strategy-name')?.value,
+        opponentName: document.getElementById('strategy-opponent')?.value,
+        matchDate: document.getElementById('strategy-date')?.value,
+        setNumber: setValue ? Number(setValue) : null,
+        baseRotation,
+      }),
+    })
+
+    const data = await res.json()
+    if (res.ok) {
+      location.href = `/teams/${teamId}/strategy/${data.id}`
+    } else if (error) {
+      error.textContent = data.error ?? data.errors?.[0]?.message ?? '作戦プランを作成できませんでした。'
+      error.classList.remove('hidden')
+    }
+  })
+</script>
