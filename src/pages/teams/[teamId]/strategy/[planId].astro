@@ -225,8 +225,8 @@ const blockFocuses = [
         </div>
       </section>
 
-      <section class="grid gap-4 xl:grid-cols-[minmax(360px,0.85fr)_minmax(560px,1.15fr)]">
-        <div class="card p-4">
+      <section class="grid gap-4 xl:grid-cols-[minmax(460px,0.95fr)_minmax(560px,1.05fr)]">
+        <div class="card p-4 xl:sticky xl:top-16 xl:self-start">
           <div class="flex flex-wrap gap-2 mb-4">
             {ROTATION_KEYS.map((key) => (
               <button type="button" class="rotation-tab rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-slate-50" data-rotation={key}>
@@ -235,7 +235,7 @@ const blockFocuses = [
             ))}
           </div>
 
-          <div id="court-panel" class="rounded-xl border bg-slate-100 p-3">
+          <div id="court-panel" class="rounded-xl border bg-slate-100 p-4">
             {ROTATION_KEYS.map((key) => {
               const rotation = planData.rotations[key]
               const layout = [
@@ -258,16 +258,16 @@ const blockFocuses = [
                     <div class="absolute left-0 right-0 top-[33%] border-t border-dashed border-orange-400"></div>
                     <div class="grid grid-rows-2">
                       {layout.map((row) => (
-                        <div class="grid grid-cols-3 min-h-[120px]">
+                        <div class="grid grid-cols-3 min-h-[160px] 2xl:min-h-[180px]">
                           {row.map((slot) => {
                             const player = playerMap.get(rotation.courtPlayerIds[slot])
                             const isSetter = rotation.setterId === rotation.courtPlayerIds[slot]
                             return (
-                              <div class={`m-1 rounded-lg border bg-white p-2 text-center text-xs ${isSetter ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}>
-                                <div class="text-[10px] font-semibold text-slate-400">{['RB', 'CB', 'LB', 'LF', 'CF', 'RF'][slot]}</div>
-                                <div class="mt-1 font-bold text-slate-900">#{player?.number ?? '?'}</div>
-                                <div class="truncate text-slate-600">{player?.name ?? '未登録'}</div>
-                                <div class="text-[10px] text-slate-400">{player?.position ?? ''}{isSetter ? ' / S' : ''}</div>
+                              <div class={`m-1.5 flex min-h-0 flex-col items-center justify-center rounded-lg border bg-white p-3 text-center text-sm ${isSetter ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}>
+                                <div class="text-[11px] font-semibold text-slate-400">{['RB', 'CB', 'LB', 'LF', 'CF', 'RF'][slot]}</div>
+                                <div class="mt-1 text-xl font-bold leading-none text-slate-900">#{player?.number ?? '?'}</div>
+                                <div class="mt-1 max-w-full truncate font-semibold text-slate-700">{player?.name ?? '未登録'}</div>
+                                <div class="mt-0.5 text-[11px] text-slate-400">{player?.position ?? ''}{isSetter ? ' / S' : ''}</div>
                               </div>
                             )
                           })}
