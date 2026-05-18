@@ -84,8 +84,24 @@
 
 - slot定義は `0=RB/right back/サーバー位置`, `1=CB/middle back`, `2=LB/left back`, `3=LF/left front`, `4=CF/middle front`, `5=RF/right front` とします。
 - UIでは `サーブ順位置` と `サーブ後守備位置` を別ラベルにします。slot 0 はローテ上のサーバー位置であり、`postServeDefensePositions` とは別物です。
-- R1→R2 のslot変換は、実装前に必ず確定する未確定仕様です。確定前に、ローテ自動生成・サーブ順・リベロ交代・セッター前後衛判定を実装しません。
-- R1→R2 の仮定義として `[0,1,2,3,4,5] -> [5,0,1,2,3,4]` を置き、公式ローテーションとUIコート図で一致を確認後、確定値として固定します。
+- R1→R2 のslot変換は `[0,1,2,3,4,5] -> [5,0,1,2,3,4]` を確定値として固定します。
+  - これは時計回りの公式ローテーションとして、`RF -> RB`, `RB -> CB`, `CB -> LB`, `LB -> LF`, `LF -> CF`, `CF -> RF` に対応します。
+  - 新しいslot基準では `next[RB]=prev[RF]`, `next[CB]=prev[RB]`, `next[LB]=prev[CB]`, `next[LF]=prev[LB]`, `next[CF]=prev[LF]`, `next[RF]=prev[CF]` です。
+  - 図解:
+
+    ```text
+    R1
+    LF:p4   CF:p5   RF:p6
+    LB:p3   CB:p2   RB:p1
+
+    R2
+    LF:p3   CF:p4   RF:p5
+    LB:p2   CB:p1   RB:p6
+
+    R3
+    LF:p2   CF:p3   RF:p4
+    LB:p1   CB:p6   RB:p5
+    ```
 - リベロは `courtPlayerIds` に含めません。`liberoReplacement` は `liberoId`, `replacedPlayerId`, `replacedSlot` を持ちます。
 - リベロは `servePhase.serverId`, `blockPlan` のブロッカー, `AttackOption.attackerId` に設定できません。
 - 後衛攻撃制限は「後衛選手が `front_*` の `attackTakeoffZone` から攻撃するケースを拒否」と定義します。

@@ -1,10 +1,12 @@
 ---
 import Base from '../../../../layouts/Base.astro'
+import QRCode from 'qrcode'
 import { env } from 'cloudflare:workers'
 import { and, eq, isNull } from 'drizzle-orm'
 import { getDb } from '../../../../lib/db'
-import { matches, players, strategyPlans, strategyRevisions, strategyShareLinks, teamMembers, teams } from '../../../../schema'
+import { matches, players, strategyPlans, strategyRevisions, strategyRoles, strategyShareLinks, teamMembers, teams } from '../../../../schema'
 import { ROTATION_KEYS, StrategyPlanDataSchema } from '../../../../lib/strategy/schema'
+import { generateShareSummaryText } from '../../../../lib/strategy/share'
 
 const user = Astro.locals.user!
 const { teamId, planId } = Astro.params as { teamId: string; planId: string }
@@ -29,7 +31,50 @@ const shareLinks = await db.select().from(strategyShareLinks)
 const revisions = await db.select().from(strategyRevisions)
   .where(and(eq(strategyRevisions.strategyPlanId, planId), eq(strategyRevisions.teamId, teamId)))
 const teamMatches = await db.select().from(matches).where(eq(matches.teamId, teamId))
-const canEdit = membership.role === 'owner'
+const explicitStrategyRole = await db.select().from(strategyRoles)
+  .where(and(eq(strategyRoles.teamId, teamId), eq(strategyRoles.userId, user.id))).get()
+const strategyRole = membership.role === 'owner' ? 'owner' : explicitStrategyRole?.role ?? 'viewer'
+const canEdit = strategyRole === 'owner' || strategyRole === 'editor'
+const canManage = strategyRole === 'owner'
+
+const scopeLabels = {
+  full: '全体共有',
+  player: '選手向け',
+  print: '印刷用',
+  summary: '要約',
+} as const
+
+function publicShareUrl(token: string) {
+  return new URL(`/share/strategy/${token}`, Astro.url).toString()
+}
+
+function dateTimeLocal(value: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const offsetMs = date.getTimezoneOffset() * 60 * 1000
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
+}
+
+const shareLinkViews = await Promise.all(shareLinks.map(async (link) => {
+  const url = publicShareUrl(link.shareToken)
+  const expired = Boolean(link.expiresAt && new Date(link.expiresAt).getTime() <= Date.now())
+  const active = Boolean(link.enabled && !link.revokedAt && !expired)
+  return {
+    ...link,
+    url,
+    path: `/share/strategy/${link.shareToken}`,
+    active,
+    expired,
+    statusLabel: expired ? '期限切れ' : active ? '有効' : '無効',
+    expiresAtLocal: dateTimeLocal(link.expiresAt),
+    qrSvg: await QRCode.toString(url, { type: 'svg', margin: 1, width: 144 }),
+  }
+}))
+const summaryShareUrl = shareLinkViews.find((link) => link.viewScope === 'summary' && link.active)?.url
+  ?? shareLinkViews.find((link) => link.active)?.url
+  ?? ''
+const shareSummaryText = generateShareSummaryText(planData, summaryShareUrl)
 
 function playerLabel(id: string) {
   const p = playerMap.get(id)
@@ -409,28 +454,97 @@ const blockFocuses = [
               <a href={`/teams/${teamId}/strategy/${planId}/print`} class="btn-secondary text-xs px-3 py-2">印刷表示</a>
             </div>
           </div>
-          <div class="mt-3 grid gap-2 sm:grid-cols-4">
-            {['full', 'player', 'print', 'summary'].map((scope) => (
-              <button type="button" class="share-create rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50" data-scope={scope} disabled={plan.status !== 'finalized' || !canEdit}>
-                {scope}
-              </button>
-            ))}
+          <div class="mt-3 rounded-lg border bg-slate-50 p-3" data-share-controls>
+            <div class="grid gap-2 sm:grid-cols-2">
+              <label class="block">
+                <span class="block text-xs font-medium text-slate-600 mb-1">共有パスワード</span>
+                <input id="share-password" data-ignore-dirty="true" type="password" class="field-input text-xs" minlength="4" placeholder="任意・4文字以上" />
+              </label>
+              <label class="block">
+                <span class="block text-xs font-medium text-slate-600 mb-1">期限</span>
+                <input id="share-expires" data-ignore-dirty="true" type="datetime-local" class="field-input text-xs" />
+              </label>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-3 text-xs text-slate-700">
+              <label class="inline-flex items-center gap-1.5">
+                <input id="share-allow-download" data-ignore-dirty="true" type="checkbox" class="h-4 w-4" />
+                ダウンロード許可
+              </label>
+              <label class="inline-flex items-center gap-1.5">
+                <input id="share-include-scout" data-ignore-dirty="true" type="checkbox" class="h-4 w-4" />
+                full共有に相手分析を含める
+              </label>
+            </div>
+            <div class="mt-3 grid gap-2 sm:grid-cols-4">
+              {(['full', 'player', 'print', 'summary'] as const).map((scope) => (
+                <button type="button" class="share-create rounded-lg border bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50" data-scope={scope} disabled={plan.status !== 'finalized' || !canEdit}>
+                  {scopeLabels[scope]}
+                </button>
+              ))}
+            </div>
           </div>
           <div id="share-message" class="mt-3 hidden rounded-lg border border-blue-100 bg-blue-50 p-2 text-xs text-blue-800"></div>
-          <div class="mt-3 space-y-2">
-            {shareLinks.length === 0 ? (
+          <div class="mt-3 space-y-3">
+            {shareLinkViews.length === 0 ? (
               <p class="text-xs text-slate-500">共有リンクはまだありません。</p>
-            ) : shareLinks.map((link) => (
-              <div class="rounded-lg border p-2 text-xs">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <div class="font-semibold">{link.viewScope} / {link.enabled && !link.revokedAt ? '有効' : '無効'}</div>
-                  <div class="flex gap-2">
-                    <a class="text-blue-700 underline" href={`/share/strategy/${link.shareToken}`} target="_blank">開く</a>
-                    <button type="button" class="share-regenerate text-blue-700 underline disabled:text-slate-400" data-share={link.id} disabled={!canEdit}>再発行</button>
-                    <button type="button" class="share-revoke text-red-700 underline disabled:text-slate-400" data-share={link.id} disabled={!canEdit}>無効化</button>
+            ) : shareLinkViews.map((link) => (
+              <div class={`rounded-lg border p-3 text-xs ${link.active ? 'bg-white' : 'bg-slate-50'}`}>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="font-semibold">{scopeLabels[link.viewScope as keyof typeof scopeLabels] ?? link.viewScope}</span>
+                      <span class={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${link.active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>{link.statusLabel}</span>
+                      {link.passwordProtected && <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">パスワード</span>}
+                    </div>
+                    <div class="mt-1 break-all text-slate-500">{link.url}</div>
+                    <div class="mt-1 text-slate-500">
+                      {link.expiresAt ? `期限: ${new Date(link.expiresAt).toLocaleString('ja-JP')}` : '期限なし'}
+                      {' / '}
+                      DL: {link.allowDownload ? '可' : '不可'}
+                      {' / '}
+                      相手分析: {link.includeOpponentScout ? '含む' : '含めない'}
+                    </div>
+                  </div>
+                  <div class="shrink-0 rounded border bg-white p-1 [&_svg]:h-24 [&_svg]:w-24" set:html={link.qrSvg}></div>
+                </div>
+                <div class="mt-3 grid gap-2 sm:grid-cols-2" data-share-controls>
+                  <input data-ignore-dirty="true" class="share-url field-input text-xs" value={link.url} readonly />
+                  <div class="flex flex-wrap gap-2">
+                    <a class="btn-secondary px-3 py-2 text-xs" href={link.path} target="_blank">開く</a>
+                    <button type="button" class="share-copy btn-secondary px-3 py-2 text-xs" data-url={link.url}>コピー</button>
+                    <button type="button" class="share-regenerate btn-secondary px-3 py-2 text-xs disabled:opacity-50" data-share={link.id} disabled={!canEdit}>再発行</button>
+                    <button type="button" class="share-revoke rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50" data-share={link.id} disabled={!canEdit || !link.active}>無効化</button>
                   </div>
                 </div>
-                <div class="mt-1 truncate text-slate-500">/share/strategy/{link.shareToken}</div>
+                <div class="mt-3 grid gap-2 sm:grid-cols-2" data-share-controls>
+                  <label class="block">
+                    <span class="block text-[11px] font-medium text-slate-600 mb-1">期限</span>
+                    <input data-ignore-dirty="true" class="share-expires field-input text-xs" data-share={link.id} type="datetime-local" value={link.expiresAtLocal} />
+                  </label>
+                  <label class="block">
+                    <span class="block text-[11px] font-medium text-slate-600 mb-1">新しいパスワード</span>
+                    <input data-ignore-dirty="true" class="share-password field-input text-xs" data-share={link.id} type="password" minlength="4" placeholder="変更時のみ入力" />
+                  </label>
+                  <div class="flex flex-wrap gap-3 text-slate-700">
+                    <label class="inline-flex items-center gap-1.5">
+                      <input data-ignore-dirty="true" class="share-enabled h-4 w-4" data-share={link.id} type="checkbox" checked={link.enabled && !link.revokedAt} disabled={Boolean(link.revokedAt)} />
+                      有効
+                    </label>
+                    <label class="inline-flex items-center gap-1.5">
+                      <input data-ignore-dirty="true" class="share-allow-download h-4 w-4" data-share={link.id} type="checkbox" checked={link.allowDownload} />
+                      ダウンロード許可
+                    </label>
+                    <label class="inline-flex items-center gap-1.5">
+                      <input data-ignore-dirty="true" class="share-include-scout h-4 w-4" data-share={link.id} type="checkbox" checked={link.includeOpponentScout} disabled={link.viewScope !== 'full'} />
+                      相手分析
+                    </label>
+                    <label class="inline-flex items-center gap-1.5">
+                      <input data-ignore-dirty="true" class="share-clear-password h-4 w-4" data-share={link.id} type="checkbox" disabled={!link.passwordProtected} />
+                      パスワード解除
+                    </label>
+                  </div>
+                  <button type="button" class="share-update btn-secondary px-3 py-2 text-xs disabled:opacity-50" data-share={link.id} disabled={!canEdit || Boolean(link.revokedAt)}>設定を保存</button>
+                </div>
               </div>
             ))}
           </div>
@@ -449,6 +563,16 @@ const blockFocuses = [
             </div>
             <button id="create-snapshot" type="button" class="btn-secondary mt-2 w-full text-xs py-2" disabled={!canEdit}>snapshotを作成</button>
           </div>
+          <div class="mt-3 rounded-lg border p-2">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <div class="text-xs font-semibold text-slate-700">LINE/Slack向けサマリー</div>
+                <div class="mt-0.5 text-[11px] text-slate-500">privateNotes、相手分析、権限情報は含めません。</div>
+              </div>
+              <button id="copy-share-summary" type="button" class="btn-secondary px-3 py-2 text-xs">コピー</button>
+            </div>
+            <textarea id="share-summary-text" data-ignore-dirty="true" class="field-input mt-2 min-h-40 text-xs" readonly>{shareSummaryText}</textarea>
+          </div>
         </div>
 
         <div class="card p-4">
@@ -461,7 +585,7 @@ const blockFocuses = [
               <div class="rounded-lg border p-2 text-xs">
                 <div class="font-semibold">{revision.summary}</div>
                 <div class="text-slate-500">{new Date(revision.editedAt).toLocaleString('ja-JP')}</div>
-                <button type="button" class="revision-restore mt-2 text-blue-700 underline disabled:text-slate-400" data-revision={revision.id} disabled={!canEdit}>この版へ復元</button>
+                <button type="button" class="revision-restore mt-2 text-blue-700 underline disabled:text-slate-400" data-revision={revision.id} disabled={!canManage}>この版へ復元</button>
               </div>
             ))}
           </div>
@@ -472,6 +596,8 @@ const blockFocuses = [
 
       <div class="sticky bottom-0 z-10 flex gap-2 rounded-t-xl border bg-white p-3 shadow-lg">
         <button id="save-plan" class="btn-primary flex-1 py-2.5" disabled={!canEdit}>保存</button>
+        <button id="duplicate-plan" class="btn-secondary flex-1 py-2.5" disabled={!canEdit}>複製</button>
+        <button id="delete-plan" class="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 disabled:opacity-50" disabled={!canManage}>削除</button>
         <a href={`/teams/${teamId}/strategy`} class="btn-secondary flex-1 py-2.5 text-center">一覧へ戻る</a>
       </div>
     </main>
@@ -504,6 +630,7 @@ const blockFocuses = [
   })
 
   document.querySelectorAll('input, select, textarea').forEach((input) => {
+    if (input.dataset.ignoreDirty === 'true') return
     input.addEventListener('input', markDirty)
     input.addEventListener('change', markDirty)
   })
@@ -618,26 +745,109 @@ const blockFocuses = [
     }
   })
 
+  document.getElementById('duplicate-plan')?.addEventListener('click', async () => {
+    const res = await fetch(`/api/teams/${teamId}/strategies/${planId}/duplicate`, { method: 'POST' })
+    const json = await res.json()
+    if (res.ok) location.href = `/teams/${teamId}/strategy/${json.id}`
+    else alert(json.error ?? '複製できませんでした。')
+  })
+
+  document.getElementById('delete-plan')?.addEventListener('click', async () => {
+    if (!confirm('この作戦プランを削除しますか？共有リンクも無効になります。')) return
+    const res = await fetch(`/api/teams/${teamId}/strategies/${planId}`, { method: 'DELETE' })
+    if (res.ok) location.href = `/teams/${teamId}/strategy`
+    else {
+      const json = await res.json()
+      alert(json.error ?? '削除できませんでした。')
+    }
+  })
+
+  function shareMessage(text, isError = false) {
+    const message = document.getElementById('share-message')
+    if (!message) return
+    message.classList.remove('hidden', 'border-blue-100', 'bg-blue-50', 'text-blue-800', 'border-red-100', 'bg-red-50', 'text-red-800')
+    message.classList.add(isError ? 'border-red-100' : 'border-blue-100', isError ? 'bg-red-50' : 'bg-blue-50', isError ? 'text-red-800' : 'text-blue-800')
+    message.textContent = text
+  }
+
+  function toIsoOrNull(value) {
+    return value ? new Date(value).toISOString() : null
+  }
+
+  function checked(selector) {
+    return Boolean(document.querySelector(selector)?.checked)
+  }
+
+  function value(selector) {
+    return document.querySelector(selector)?.value ?? ''
+  }
+
+  document.querySelectorAll('.share-copy').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const url = button.dataset.url
+      if (!url) return
+      await navigator.clipboard.writeText(url)
+      shareMessage('共有URLをコピーしました。')
+    })
+  })
+
+  document.getElementById('copy-share-summary')?.addEventListener('click', async () => {
+    const text = document.getElementById('share-summary-text')?.value ?? ''
+    await navigator.clipboard.writeText(text)
+    shareMessage('共有サマリーをコピーしました。')
+  })
+
   document.querySelectorAll('.share-create').forEach((button) => {
     button.addEventListener('click', async () => {
       const scope = button.dataset.scope
+      const password = value('#share-password')
+      const expiresAt = toIsoOrNull(value('#share-expires'))
       const res = await fetch(`/api/teams/${teamId}/strategies/${planId}/share-links`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           viewScope: scope,
-          allowDownload: scope === 'print',
-          includeOpponentScout: false,
+          ...(password ? { password } : {}),
+          expiresAt,
+          allowDownload: checked('#share-allow-download') || scope === 'print',
+          includeOpponentScout: scope === 'full' && checked('#share-include-scout'),
         }),
       })
       const json = await res.json()
-      const message = document.getElementById('share-message')
-      if (!message) return
-      message.classList.remove('hidden')
       if (res.ok) {
-        message.textContent = `共有リンクを作成しました: ${json.url}`
+        shareMessage(`共有リンクを作成しました: ${json.url}`)
+        location.reload()
       } else {
-        message.textContent = json.error ?? '共有リンクを作成できませんでした。'
+        shareMessage(json.error ?? '共有リンクを作成できませんでした。', true)
+      }
+    })
+  })
+
+  document.querySelectorAll('.share-update').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const shareId = button.dataset.share
+      const password = value(`.share-password[data-share="${shareId}"]`)
+      const clearPassword = checked(`.share-clear-password[data-share="${shareId}"]`)
+      const body = {
+        enabled: checked(`.share-enabled[data-share="${shareId}"]`),
+        expiresAt: toIsoOrNull(value(`.share-expires[data-share="${shareId}"]`)),
+        allowDownload: checked(`.share-allow-download[data-share="${shareId}"]`),
+        includeOpponentScout: checked(`.share-include-scout[data-share="${shareId}"]`),
+      }
+      if (password) body.password = password
+      if (clearPassword) body.password = null
+
+      const res = await fetch(`/api/teams/${teamId}/strategies/${planId}/share-links/${shareId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        shareMessage('共有リンク設定を保存しました。')
+        location.reload()
+      } else {
+        shareMessage(json.error ?? '共有リンク設定を保存できませんでした。', true)
       }
     })
   })

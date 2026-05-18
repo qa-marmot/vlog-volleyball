@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import bcrypt from 'bcryptjs'
 import { and, desc, eq, isNull } from 'drizzle-orm'
-import { players, strategyPlans, strategyRevisions, strategyShareLinks, strategySnapshots, teamMembers } from '@/schema'
+import { players, strategyPlans, strategyRevisions, strategyRoles, strategyShareLinks, strategySnapshots, teamMembers, users } from '@/schema'
 import { getDb } from '../db'
 import {
   buildDefaultStrategyPlanData,
@@ -17,6 +17,7 @@ import {
 import type { HonoEnv } from '../hono'
 
 const strategiesRoute = new Hono<HonoEnv>()
+type StrategyRole = 'owner' | 'editor' | 'viewer'
 
 async function assertMember(db: ReturnType<typeof getDb>, teamId: string, userId: string) {
   return db.select().from(teamMembers)
@@ -47,12 +48,19 @@ function toResponse(plan: typeof strategyPlans.$inferSelect) {
   }
 }
 
-function strategyRole(membership: { role: string }) {
-  return membership.role === 'owner' ? 'owner' : 'viewer'
+async function resolveStrategyRole(db: ReturnType<typeof getDb>, membership: { teamId: string; userId: string; role: string }): Promise<StrategyRole> {
+  if (membership.role === 'owner') return 'owner'
+  const explicitRole = await db.select().from(strategyRoles)
+    .where(and(eq(strategyRoles.teamId, membership.teamId), eq(strategyRoles.userId, membership.userId))).get()
+  return explicitRole?.role ?? 'viewer'
 }
 
-function canEditStrategy(membership: { role: string }) {
-  return membership.role === 'owner'
+function canEditStrategy(role: StrategyRole) {
+  return role === 'owner' || role === 'editor'
+}
+
+function canManageStrategy(role: StrategyRole) {
+  return role === 'owner'
 }
 
 function changedTopLevelFields(before: StrategyPlanData, after: StrategyPlanData) {
@@ -107,14 +115,14 @@ strategiesRoute.get('/', async (c) => {
   const db = getDb(c.env.DB)
   const membership = await assertMember(db, teamId, user.id)
   if (!membership) return c.json({ error: '権限がありません' }, 403)
-  if (!canEditStrategy(membership)) return c.json({ error: '作戦を作成できる権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
 
   const plans = await db.select().from(strategyPlans)
     .where(and(eq(strategyPlans.teamId, teamId), isNull(strategyPlans.deletedAt)))
 
   return c.json({
     plans: plans.map(toResponse),
-    strategyRole: strategyRole(membership),
+    strategyRole: role,
   })
 })
 
@@ -126,7 +134,8 @@ strategiesRoute.post('/', async (c) => {
   const db = getDb(c.env.DB)
   const membership = await assertMember(db, teamId, user.id)
   if (!membership) return c.json({ error: '権限がありません' }, 403)
-  if (!canEditStrategy(membership)) return c.json({ error: '共有を管理できる権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
+  if (!canEditStrategy(role)) return c.json({ error: '作戦を作成できる権限がありません' }, 403)
 
   const body = await c.req.json<{
     name: string
@@ -174,6 +183,84 @@ strategiesRoute.post('/', async (c) => {
   return c.json({ id, warnings: validation.warnings })
 })
 
+strategiesRoute.get('/roles', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.json({ error: '認証が必要です' }, 401)
+
+  const { teamId } = c.req.param()
+  const db = getDb(c.env.DB)
+  const membership = await assertMember(db, teamId, user.id)
+  if (!membership) return c.json({ error: '権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
+  if (!canManageStrategy(role)) return c.json({ error: '作戦権限を管理できる権限がありません' }, 403)
+
+  const members = await db.select({
+    userId: teamMembers.userId,
+    teamRole: teamMembers.role,
+    email: users.email,
+    strategyRole: strategyRoles.role,
+  })
+    .from(teamMembers)
+    .innerJoin(users, eq(teamMembers.userId, users.id))
+    .leftJoin(strategyRoles, and(eq(strategyRoles.teamId, teamMembers.teamId), eq(strategyRoles.userId, teamMembers.userId)))
+    .where(eq(teamMembers.teamId, teamId))
+
+  return c.json({
+    roles: members.map((member) => ({
+      userId: member.userId,
+      email: member.email,
+      teamRole: member.teamRole,
+      strategyRole: member.teamRole === 'owner' ? 'owner' : member.strategyRole ?? 'viewer',
+      editable: member.teamRole !== 'owner',
+    })),
+  })
+})
+
+strategiesRoute.patch('/roles/:userId', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.json({ error: '認証が必要です' }, 401)
+
+  const { teamId, userId } = c.req.param()
+  const db = getDb(c.env.DB)
+  const membership = await assertMember(db, teamId, user.id)
+  if (!membership) return c.json({ error: '権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
+  if (!canManageStrategy(role)) return c.json({ error: '作戦権限を管理できる権限がありません' }, 403)
+
+  const targetMembership = await assertMember(db, teamId, userId)
+  if (!targetMembership) return c.json({ error: '対象ユーザーがチームに参加していません' }, 404)
+  if (targetMembership.role === 'owner') return c.json({ error: 'チームownerは常に作戦ownerです' }, 400)
+
+  const body = await c.req.json<{ role?: StrategyRole }>()
+  if (!body.role || !['owner', 'editor', 'viewer'].includes(body.role)) {
+    return c.json({ error: '不正な作戦ロールです' }, 400)
+  }
+
+  const now = new Date().toISOString()
+  const existing = await db.select().from(strategyRoles)
+    .where(and(eq(strategyRoles.teamId, teamId), eq(strategyRoles.userId, userId))).get()
+  if (existing) {
+    await db.update(strategyRoles).set({
+      role: body.role,
+      updatedBy: user.id,
+      updatedAt: now,
+    }).where(eq(strategyRoles.id, existing.id))
+  } else {
+    await db.insert(strategyRoles).values({
+      id: crypto.randomUUID(),
+      teamId,
+      userId,
+      role: body.role,
+      createdBy: user.id,
+      updatedBy: user.id,
+      createdAt: now,
+      updatedAt: now,
+    })
+  }
+
+  return c.json({ ok: true, strategyRole: body.role })
+})
+
 strategiesRoute.get('/:planId/share-links', async (c) => {
   const user = c.get('user')
   if (!user) return c.json({ error: '認証が必要です' }, 401)
@@ -182,7 +269,8 @@ strategiesRoute.get('/:planId/share-links', async (c) => {
   const db = getDb(c.env.DB)
   const membership = await assertMember(db, teamId, user.id)
   if (!membership) return c.json({ error: '権限がありません' }, 403)
-  if (!canEditStrategy(membership)) return c.json({ error: '共有を管理できる権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
+  if (!canEditStrategy(role)) return c.json({ error: '共有を管理できる権限がありません' }, 403)
 
   const links = await db.select().from(strategyShareLinks)
     .where(and(eq(strategyShareLinks.teamId, teamId), eq(strategyShareLinks.strategyPlanId, planId)))
@@ -205,7 +293,8 @@ strategiesRoute.post('/:planId/share-links', async (c) => {
   const db = getDb(c.env.DB)
   const membership = await assertMember(db, teamId, user.id)
   if (!membership) return c.json({ error: '権限がありません' }, 403)
-  if (!canEditStrategy(membership)) return c.json({ error: '共有を管理できる権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
+  if (!canEditStrategy(role)) return c.json({ error: '共有を管理できる権限がありません' }, 403)
 
   const plan = await db.select().from(strategyPlans)
     .where(and(eq(strategyPlans.id, planId), eq(strategyPlans.teamId, teamId), isNull(strategyPlans.deletedAt))).get()
@@ -247,7 +336,8 @@ strategiesRoute.patch('/:planId/share-links/:shareId', async (c) => {
   const db = getDb(c.env.DB)
   const membership = await assertMember(db, teamId, user.id)
   if (!membership) return c.json({ error: '権限がありません' }, 403)
-  if (!canEditStrategy(membership)) return c.json({ error: '共有を管理できる権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
+  if (!canEditStrategy(role)) return c.json({ error: '共有を管理できる権限がありません' }, 403)
 
   const body = await c.req.json<{
     enabled?: boolean
@@ -256,12 +346,20 @@ strategiesRoute.patch('/:planId/share-links/:shareId', async (c) => {
     includeOpponentScout?: boolean
     password?: string | null
   }>()
+  const link = await db.select().from(strategyShareLinks)
+    .where(and(
+      eq(strategyShareLinks.id, shareId),
+      eq(strategyShareLinks.strategyPlanId, planId),
+      eq(strategyShareLinks.teamId, teamId),
+    )).get()
+  if (!link) return c.json({ error: '共有リンクが見つかりません' }, 404)
+
   const passwordHash = body.password ? await bcrypt.hash(body.password, 10) : body.password === null ? null : undefined
   await db.update(strategyShareLinks).set({
     ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
     ...(body.expiresAt !== undefined ? { expiresAt: body.expiresAt || null } : {}),
     ...(body.allowDownload !== undefined ? { allowDownload: body.allowDownload } : {}),
-    ...(body.includeOpponentScout !== undefined ? { includeOpponentScout: body.includeOpponentScout } : {}),
+    ...(body.includeOpponentScout !== undefined ? { includeOpponentScout: body.includeOpponentScout && link.viewScope === 'full' } : {}),
     ...(passwordHash !== undefined ? { passwordHash, passwordProtected: Boolean(passwordHash) } : {}),
     updatedAt: new Date().toISOString(),
   }).where(and(
@@ -281,7 +379,8 @@ strategiesRoute.post('/:planId/share-links/:shareId/regenerate', async (c) => {
   const db = getDb(c.env.DB)
   const membership = await assertMember(db, teamId, user.id)
   if (!membership) return c.json({ error: '権限がありません' }, 403)
-  if (!canEditStrategy(membership)) return c.json({ error: '変更履歴を復元できる権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
+  if (!canEditStrategy(role)) return c.json({ error: '共有を管理できる権限がありません' }, 403)
 
   const token = crypto.randomUUID()
   await db.update(strategyShareLinks).set({
@@ -306,7 +405,8 @@ strategiesRoute.delete('/:planId/share-links/:shareId', async (c) => {
   const db = getDb(c.env.DB)
   const membership = await assertMember(db, teamId, user.id)
   if (!membership) return c.json({ error: '権限がありません' }, 403)
-  if (!canEditStrategy(membership)) return c.json({ error: 'snapshotを作成できる権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
+  if (!canEditStrategy(role)) return c.json({ error: '共有を管理できる権限がありません' }, 403)
 
   await db.update(strategyShareLinks).set({
     enabled: false,
@@ -329,7 +429,8 @@ strategiesRoute.get('/:planId/revisions', async (c) => {
   const db = getDb(c.env.DB)
   const membership = await assertMember(db, teamId, user.id)
   if (!membership) return c.json({ error: '権限がありません' }, 403)
-  if (!canEditStrategy(membership)) return c.json({ error: '作戦を編集できる権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
+  if (!canEditStrategy(role)) return c.json({ error: '変更履歴を閲覧できる権限がありません' }, 403)
 
   const revisions = await db.select().from(strategyRevisions)
     .where(and(eq(strategyRevisions.teamId, teamId), eq(strategyRevisions.strategyPlanId, planId)))
@@ -355,7 +456,8 @@ strategiesRoute.post('/:planId/revisions/:revisionId/restore', async (c) => {
   const db = getDb(c.env.DB)
   const membership = await assertMember(db, teamId, user.id)
   if (!membership) return c.json({ error: '権限がありません' }, 403)
-  if (!canEditStrategy(membership)) return c.json({ error: '作戦を複製できる権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
+  if (!canManageStrategy(role)) return c.json({ error: '変更履歴を復元できる権限がありません' }, 403)
 
   const plan = await db.select().from(strategyPlans)
     .where(and(eq(strategyPlans.id, planId), eq(strategyPlans.teamId, teamId), isNull(strategyPlans.deletedAt))).get()
@@ -401,6 +503,7 @@ strategiesRoute.post('/:planId/snapshots', async (c) => {
   const db = getDb(c.env.DB)
   const membership = await assertMember(db, teamId, user.id)
   if (!membership) return c.json({ error: '権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
 
   const plan = await db.select().from(strategyPlans)
     .where(and(eq(strategyPlans.id, planId), eq(strategyPlans.teamId, teamId), isNull(strategyPlans.deletedAt))).get()
@@ -441,7 +544,7 @@ strategiesRoute.get('/:planId', async (c) => {
   return c.json({
     plan: toResponse(plan),
     validation: { errors: validation.errors, warnings: validation.warnings },
-    strategyRole: strategyRole(membership),
+    strategyRole: role,
   })
 })
 
@@ -453,6 +556,8 @@ strategiesRoute.put('/:planId', async (c) => {
   const db = getDb(c.env.DB)
   const membership = await assertMember(db, teamId, user.id)
   if (!membership) return c.json({ error: '権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
+  if (!canEditStrategy(role)) return c.json({ error: '作戦を編集できる権限がありません' }, 403)
 
   const existing = await db.select().from(strategyPlans)
     .where(and(eq(strategyPlans.id, planId), eq(strategyPlans.teamId, teamId), isNull(strategyPlans.deletedAt))).get()
@@ -497,6 +602,8 @@ strategiesRoute.post('/:planId/duplicate', async (c) => {
   const db = getDb(c.env.DB)
   const membership = await assertMember(db, teamId, user.id)
   if (!membership) return c.json({ error: '権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
+  if (!canEditStrategy(role)) return c.json({ error: '作戦を複製できる権限がありません' }, 403)
 
   const existing = await db.select().from(strategyPlans)
     .where(and(eq(strategyPlans.id, planId), eq(strategyPlans.teamId, teamId), isNull(strategyPlans.deletedAt))).get()
@@ -537,7 +644,9 @@ strategiesRoute.delete('/:planId', async (c) => {
   const { teamId, planId } = c.req.param()
   const db = getDb(c.env.DB)
   const membership = await assertMember(db, teamId, user.id)
-  if (!membership || membership.role !== 'owner') return c.json({ error: '権限がありません' }, 403)
+  if (!membership) return c.json({ error: '権限がありません' }, 403)
+  const role = await resolveStrategyRole(db, membership)
+  if (!canManageStrategy(role)) return c.json({ error: '権限がありません' }, 403)
 
   const now = new Date().toISOString()
   await db.update(strategyPlans).set({
