@@ -22,6 +22,7 @@ interface DetailLogModalProps {
   open: boolean
   scorer: 'home' | 'away'
   homePlayers: Player[]
+  courtPlayerIds?: string[]
   onConfirm: (detail: PointDetail) => void
   onSkip: () => void
   onCancel: () => void
@@ -31,6 +32,7 @@ export function DetailLogModal({
   open,
   scorer,
   homePlayers,
+  courtPlayerIds,
   onConfirm,
   onSkip,
   onCancel,
@@ -93,7 +95,7 @@ export function DetailLogModal({
             <div>
               <div className="text-sm font-medium text-slate-600 mb-3">得点した選手</div>
               <div className="grid grid-cols-2 gap-2">
-                {homePlayers.filter((p) => !p.is_libero).map((p) => (
+                {homePlayers.filter((p) => !p.is_libero && (!courtPlayerIds || courtPlayerIds.includes(p.id))).map((p) => (
                   <button
                     key={p.id}
                     onClick={() => setSelectedPlayer(p.id)}

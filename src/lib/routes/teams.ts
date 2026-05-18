@@ -106,6 +106,29 @@ teamsRoute.post('/:teamId/players', async (c) => {
   return c.json({ id })
 })
 
+// 選手編集
+teamsRoute.patch('/:teamId/players/:playerId', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.json({ error: '認証が必要です' }, 401)
+
+  const { teamId, playerId } = c.req.param()
+  const db = getDb(c.env.DB)
+
+  const membership = await db.select().from(teamMembers)
+    .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, user.id))).get()
+  if (!membership) return c.json({ error: '権限がありません' }, 403)
+
+  const body = await c.req.json<{ name?: string; number?: number; position?: string | null; isLibero?: boolean }>()
+  await db.update(players).set({
+    ...(body.name !== undefined ? { name: body.name.trim() } : {}),
+    ...(body.number !== undefined ? { number: body.number } : {}),
+    ...(body.position !== undefined ? { position: body.position as any } : {}),
+    ...(body.isLibero !== undefined ? { isLibero: body.isLibero } : {}),
+  }).where(and(eq(players.id, playerId), eq(players.teamId, teamId)))
+
+  return c.json({ ok: true })
+})
+
 // 選手削除
 teamsRoute.delete('/:teamId/players/:playerId', async (c) => {
   const user = c.get('user')

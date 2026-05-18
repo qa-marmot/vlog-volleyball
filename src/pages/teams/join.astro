@@ -35,8 +35,6 @@ import Base from '../../layouts/Base.astro'
   const btn = form.querySelector('button[type="submit"]') as HTMLButtonElement
   const codeInput = document.getElementById('code') as HTMLInputElement
 
-  codeInput.addEventListener('input', () => { codeInput.value = codeInput.value.toUpperCase() })
-
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
     btn.disabled = true
@@ -47,7 +45,7 @@ import Base from '../../layouts/Base.astro'
     const res = await fetch('/api/teams/join', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: fd.get('code') }),
+      body: JSON.stringify({ code: (fd.get('code') as string).toUpperCase().trim() }),
     })
 
     if (res.ok) {

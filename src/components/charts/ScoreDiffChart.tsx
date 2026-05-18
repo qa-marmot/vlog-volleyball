@@ -1,37 +1,30 @@
 'use client'
 
 import {
-  LineChart,
-  Line,
+  ComposedChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
-  ResponsiveContainer,
   ReferenceLine,
   ReferenceArea,
+  ResponsiveContainer,
 } from 'recharts'
 import type { ScoreTimelinePoint } from '@/types'
 
-interface ScoreProgressChartProps {
+interface ScoreDiffChartProps {
   timeline: ScoreTimelinePoint[]
   teamName: string
-  opponentName: string
 }
 
-export function ScoreProgressChart({
-  timeline,
-  teamName,
-  opponentName,
-}: ScoreProgressChartProps) {
-  if (timeline.length === 0) {
-    return (
-      <div className="text-center text-sm text-muted-foreground py-8">
-        データがありません
-      </div>
-    )
-  }
+export function ScoreDiffChart({ timeline, teamName }: ScoreDiffChartProps) {
+  if (timeline.length === 0) return null
+
+  const data = timeline.map((p) => ({
+    ...p,
+    diff: p.homeScore - p.awayScore,
+  }))
 
   // セットごとのX範囲を計算
   const setRangeMap = new Map<number, { start: number; end: number }>()
@@ -48,7 +41,7 @@ export function ScoreProgressChart({
     .map(([setNumber, { start, end }]) => ({ setNumber, start, end }))
     .sort((a, b) => a.setNumber - b.setNumber)
 
-  // セット区切り線の位置
+  // セット区切り線
   const setChanges: number[] = []
   for (let i = 1; i < timeline.length; i++) {
     if (timeline[i].setNumber !== timeline[i - 1].setNumber) {
@@ -57,30 +50,28 @@ export function ScoreProgressChart({
   }
 
   return (
-    <div className="w-full h-64">
+    <div className="w-full h-48">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart
-          data={timeline}
-          margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
-        >
+        <ComposedChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+          <defs>
+            <linearGradient id="diffGradientPos" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#1d4ed8" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0.05} />
+            </linearGradient>
+            <linearGradient id="diffGradientNeg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#dc2626" stopOpacity={0.05} />
+              <stop offset="95%" stopColor="#dc2626" stopOpacity={0.3} />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-          <XAxis
-            dataKey="pointNumber"
-            tick={{ fontSize: 10 }}
-            label={{ value: '得点', position: 'insideBottomRight', offset: 0, fontSize: 10 }}
-          />
+          <XAxis dataKey="pointNumber" tick={{ fontSize: 10 }} />
           <YAxis tick={{ fontSize: 10 }} />
           <Tooltip
-            formatter={(value, name) => [
-              String(value) + '点',
-              name === 'homeScore' ? teamName : opponentName,
+            formatter={(value: number) => [
+              value > 0 ? `+${value}（${teamName}リード）` : value < 0 ? `${value}（相手リード）` : '同点',
+              '点差',
             ]}
             labelFormatter={(label) => `${label}点目`}
-          />
-          <Legend
-            formatter={(value) =>
-              value === 'homeScore' ? teamName : opponentName
-            }
           />
           {/* セット別背景帯 */}
           {setRanges.map(({ setNumber, start, end }) => (
@@ -93,6 +84,7 @@ export function ScoreProgressChart({
               label={{ value: `第${setNumber}S`, position: 'insideTopLeft', fontSize: 9, fill: '#94a3b8' }}
             />
           ))}
+          <ReferenceLine y={0} stroke="#64748b" strokeWidth={1.5} />
           {/* セット区切り線 */}
           {setChanges.map((x) => (
             <ReferenceLine
@@ -102,23 +94,18 @@ export function ScoreProgressChart({
               strokeDasharray="4 2"
             />
           ))}
-          <Line
+          {/* リード側（正） */}
+          <Area
             type="monotone"
-            dataKey="homeScore"
+            dataKey="diff"
             stroke="#1d4ed8"
-            strokeWidth={2.5}
+            strokeWidth={2}
+            fill="url(#diffGradientPos)"
             dot={false}
-            activeDot={{ r: 4 }}
+            activeDot={{ r: 3 }}
+            baseValue={0}
           />
-          <Line
-            type="monotone"
-            dataKey="awayScore"
-            stroke="#dc2626"
-            strokeWidth={2.5}
-            dot={false}
-            activeDot={{ r: 4 }}
-          />
-        </LineChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   )

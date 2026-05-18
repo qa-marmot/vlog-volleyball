@@ -179,8 +179,8 @@ describe('computeTimelineWithSets', () => {
       makePoint({ id: '3', set_id: 's2', point_number: 3, home_score: 0, away_score: 1 }),
     ]
     const sets = [
-      { id: 's1', set_number: 1 },
-      { id: 's2', set_number: 2 },
+      { id: 's1', set_number: 1, home_score: 2, away_score: 0, completed: true },
+      { id: 's2', set_number: 2, home_score: 0, away_score: 0, completed: false },
     ]
     const timeline = computeTimelineWithSets(points, sets)
     expect(timeline[0].setNumber).toBe(1)
@@ -205,7 +205,7 @@ describe('computeTimelineWithSets', () => {
     const points: Point[] = [
       makePoint({ id: '1', set_id: 's1', point_number: 5, home_score: 3, away_score: 2 }),
     ]
-    const sets = [{ id: 's1', set_number: 2 }]
+    const sets = [{ id: 's1', set_number: 2, home_score: 0, away_score: 0, completed: false }]
     const timeline = computeTimelineWithSets(points, sets)
     expect(timeline[0]).toEqual({ pointNumber: 5, homeScore: 3, awayScore: 2, setNumber: 2 })
   })

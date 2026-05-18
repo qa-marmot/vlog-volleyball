@@ -46,6 +46,7 @@ interface MatchState {
 
   // セット内のpoints（sync用バッファ）
   pendingPoints: Array<{
+    id: string
     setNumber: number
     pointNumber: number
     scorer: 'home' | 'away'
@@ -195,6 +196,7 @@ export const useMatchStore = create<MatchStore>()(
         const isDetailLogged = state.detailLogEnabled && detail !== undefined
 
         const pending = {
+          id: crypto.randomUUID(),
           setNumber: state.currentSetNumber,
           pointNumber: newPointNumber,
           scorer,

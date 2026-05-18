@@ -1,0 +1,909 @@
+---
+import Base from '../../../../layouts/Base.astro'
+import QRCode from 'qrcode'
+import { env } from 'cloudflare:workers'
+import { and, eq, isNull } from 'drizzle-orm'
+import { getDb } from '../../../../lib/db'
+import { matches, players, strategyPlans, strategyRevisions, strategyRoles, strategyShareLinks, teamMembers, teams } from '../../../../schema'
+import { ROTATION_KEYS, StrategyPlanDataSchema } from '../../../../lib/strategy/schema'
+import { generateShareSummaryText } from '../../../../lib/strategy/share'
+
+const user = Astro.locals.user!
+const { teamId, planId } = Astro.params as { teamId: string; planId: string }
+const db = getDb(env.DB)
+
+const membership = await db.select().from(teamMembers)
+  .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, user.id))).get()
+if (!membership) return Astro.redirect('/dashboard')
+
+const team = await db.select().from(teams).where(eq(teams.id, teamId)).get()
+if (!team) return Astro.redirect('/dashboard')
+
+const plan = await db.select().from(strategyPlans)
+  .where(and(eq(strategyPlans.id, planId), eq(strategyPlans.teamId, teamId), isNull(strategyPlans.deletedAt))).get()
+if (!plan) return Astro.redirect(`/teams/${teamId}/strategy`)
+
+const teamPlayers = await db.select().from(players).where(eq(players.teamId, teamId))
+const playerMap = new Map(teamPlayers.map((p) => [p.id, p]))
+const planData = StrategyPlanDataSchema.parse(JSON.parse(plan.data))
+const shareLinks = await db.select().from(strategyShareLinks)
+  .where(and(eq(strategyShareLinks.strategyPlanId, planId), eq(strategyShareLinks.teamId, teamId)))
+const revisions = await db.select().from(strategyRevisions)
+  .where(and(eq(strategyRevisions.strategyPlanId, planId), eq(strategyRevisions.teamId, teamId)))
+const teamMatches = await db.select().from(matches).where(eq(matches.teamId, teamId))
+const explicitStrategyRole = await db.select().from(strategyRoles)
+  .where(and(eq(strategyRoles.teamId, teamId), eq(strategyRoles.userId, user.id))).get()
+const strategyRole = membership.role === 'owner' ? 'owner' : explicitStrategyRole?.role ?? 'viewer'
+const canEdit = strategyRole === 'owner' || strategyRole === 'editor'
+const canManage = strategyRole === 'owner'
+
+const scopeLabels = {
+  full: '全体共有',
+  player: '選手向け',
+  print: '印刷用',
+  summary: '要約',
+} as const
+
+function publicShareUrl(token: string) {
+  return new URL(`/share/strategy/${token}`, Astro.url).toString()
+}
+
+function dateTimeLocal(value: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const offsetMs = date.getTimezoneOffset() * 60 * 1000
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
+}
+
+const shareLinkViews = await Promise.all(shareLinks.map(async (link) => {
+  const url = publicShareUrl(link.shareToken)
+  const expired = Boolean(link.expiresAt && new Date(link.expiresAt).getTime() <= Date.now())
+  const active = Boolean(link.enabled && !link.revokedAt && !expired)
+  return {
+    ...link,
+    url,
+    path: `/share/strategy/${link.shareToken}`,
+    active,
+    expired,
+    statusLabel: expired ? '期限切れ' : active ? '有効' : '無効',
+    expiresAtLocal: dateTimeLocal(link.expiresAt),
+    qrSvg: await QRCode.toString(url, { type: 'svg', margin: 1, width: 144 }),
+  }
+}))
+const summaryShareUrl = shareLinkViews.find((link) => link.viewScope === 'summary' && link.active)?.url
+  ?? shareLinkViews.find((link) => link.active)?.url
+  ?? ''
+const shareSummaryText = generateShareSummaryText(planData, summaryShareUrl)
+
+function playerLabel(id: string) {
+  const p = playerMap.get(id)
+  if (!p) return '未登録'
+  return `#${p.number} ${p.name}${p.position ? ` ${p.position}` : ''}`
+}
+
+const attackTypes = [
+  ['quick_a', 'Aクイック'],
+  ['quick_b', 'Bクイック'],
+  ['parallel_left', 'レフト平行'],
+  ['parallel_right', 'ライト平行'],
+  ['back_attack', 'バックアタック'],
+  ['pipe', 'パイプ'],
+  ['broad', 'ブロード'],
+  ['setter_dump', 'セッターダンプ'],
+  ['second_ball', '二段'],
+  ['out_of_system', '崩れた時'],
+]
+const takeoffZones = [
+  ['front_left', '前衛左'],
+  ['front_middle', '前衛中央'],
+  ['front_right', '前衛右'],
+  ['back_left_behind_3m', '後衛左 3m後方'],
+  ['back_middle_behind_3m', '後衛中央 3m後方'],
+  ['back_right_behind_3m', '後衛右 3m後方'],
+]
+const targetZones = [
+  ['front_left', '相手前左'],
+  ['front_middle', '相手前中央'],
+  ['front_right', '相手前右'],
+  ['middle_left', '相手中左'],
+  ['middle_center', '相手中中央'],
+  ['middle_right', '相手中右'],
+  ['back_left', '相手奥左'],
+  ['back_middle', '相手奥中央'],
+  ['back_right', '相手奥右'],
+]
+const attackIntents = [
+  ['kill', '決定'],
+  ['block_out', 'ブロックアウト'],
+  ['tip', 'フェイント'],
+  ['touch_out', 'ワンタッチ狙い'],
+  ['course_shot', 'コース打ち'],
+  ['recycle', 'つなぎ'],
+  ['safe_return', '安全返球'],
+  ['target_weak_blocker', '低いブロック狙い'],
+  ['target_poor_defender', '弱い守備者狙い'],
+  ['target_setter_area', 'セッター周辺狙い'],
+  ['deep_corner', '奥角'],
+  ['wipe_block', 'ブロック利用'],
+]
+const serveTargets = [
+  ['short', '短め'],
+  ['deep', '深め'],
+  ['seam', '選手間'],
+  ['player_zone', '選手・ゾーン'],
+  ['avoid_libero', 'リベロ回避'],
+  ['front_back_gap', '前後差'],
+  ['setter_front', 'セッター前'],
+  ['approach_disrupt', '助走を潰す'],
+  ['sideline', 'サイドライン際'],
+  ['endline', 'エンドライン際'],
+  ['safe_in', '安全に入れる'],
+]
+const blockSystems = [
+  ['read', 'リード'],
+  ['commit', 'コミット'],
+  ['bunch', 'バンチ'],
+  ['spread', 'スプレッド'],
+]
+const blockFocuses = [
+  ['cross', 'クロス'],
+  ['line', 'ライン'],
+  ['middle', 'ミドル'],
+  ['pipe', 'パイプ'],
+  ['setter_dump', 'セッターダンプ'],
+]
+---
+<Base title={`${plan.name} 作戦ボード`}>
+  <div class="min-h-screen bg-slate-50">
+    <header class="app-header px-2 py-2 sticky top-0 z-10">
+      <div class="max-w-5xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <a href={`/teams/${teamId}/strategy`} class="flex items-center justify-center min-h-[44px] min-w-[44px] px-3 text-slate-300 hover:text-white text-lg font-bold transition-colors rounded-lg hover:bg-white/10">←</a>
+          <div>
+            <div class="text-sm font-semibold text-white">{plan.name}</div>
+            <div class="text-xs text-slate-400">{team.name}</div>
+          </div>
+        </div>
+        <span id="dirty-badge" class="hidden text-[11px] rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-800">未保存</span>
+      </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto p-4 space-y-4">
+      {!canEdit && (
+        <section class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+          この作戦プランは閲覧専用です。編集・共有管理・復元はownerのみ実行できます。
+        </section>
+      )}
+
+      <section class="card p-4">
+        <div class="grid gap-3 sm:grid-cols-4">
+          <label class="block sm:col-span-2">
+            <span class="block text-sm font-medium text-slate-700 mb-1.5">プラン名</span>
+            <input id="plan-name" class="field-input" value={planData.name} />
+          </label>
+          <label class="block">
+            <span class="block text-sm font-medium text-slate-700 mb-1.5">状態</span>
+            <select id="plan-status" class="field-input">
+              <option value="draft" selected={plan.status === 'draft'}>draft</option>
+              <option value="finalized" selected={plan.status === 'finalized'}>finalized</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="block text-sm font-medium text-slate-700 mb-1.5">セット</span>
+            <select id="plan-set" class="field-input">
+              <option value="" selected={planData.setNumber === null}>未設定</option>
+              {[1, 2, 3, 4, 5].map((n) => <option value={n} selected={planData.setNumber === n}>第{n}セット</option>)}
+            </select>
+          </label>
+          <label class="block">
+            <span class="block text-sm font-medium text-slate-700 mb-1.5">相手</span>
+            <input id="plan-opponent" class="field-input" value={planData.opponentName} />
+          </label>
+          <label class="block">
+            <span class="block text-sm font-medium text-slate-700 mb-1.5">開始ローテ</span>
+            <select id="plan-starting-rotation" class="field-input">
+              <option value="" selected={planData.startingRotationKey === null}>未設定</option>
+              {ROTATION_KEYS.map((key) => <option value={key} selected={planData.startingRotationKey === key}>{key}</option>)}
+            </select>
+          </label>
+          <label class="block">
+            <span class="block text-sm font-medium text-slate-700 mb-1.5">開始サーブ</span>
+            <select id="plan-serving-team" class="field-input">
+              <option value="unknown" selected={planData.initialServingTeam === 'unknown'}>未定</option>
+              <option value="own" selected={planData.initialServingTeam === 'own'}>自チーム</option>
+              <option value="opponent" selected={planData.initialServingTeam === 'opponent'}>相手</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="block text-sm font-medium text-slate-700 mb-1.5">システム</span>
+            <select id="plan-system" class="field-input">
+              {['5-1', '6-2', '4-2', 'other'].map((value) => <option value={value} selected={planData.systemType === value}>{value}</option>)}
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div class="card p-4">
+          <div class="flex flex-wrap gap-2 mb-4">
+            {ROTATION_KEYS.map((key) => (
+              <button type="button" class="rotation-tab rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-slate-50" data-rotation={key}>
+                {key}<span class="block text-[10px] text-slate-400">{key === 'R1' ? '基準ローテ' : '基準から回転'}</span>
+              </button>
+            ))}
+          </div>
+
+          <div id="court-panel" class="rounded-xl border bg-slate-100 p-3">
+            {ROTATION_KEYS.map((key) => {
+              const rotation = planData.rotations[key]
+              const layout = [
+                [3, 4, 5],
+                [2, 1, 0],
+              ]
+              return (
+                <div class="rotation-court hidden" data-court={key}>
+                  <div class="mb-2 flex items-center justify-between">
+                    <div class="text-sm font-bold text-slate-900">{key}｜{key === 'R1' ? '基準ローテ' : '基準ローテから回転'}</div>
+                    <div class="text-xs text-slate-500">サーバー位置: {playerLabel(rotation.courtPlayerIds[0])}</div>
+                  </div>
+                  <div class="relative overflow-hidden rounded-lg border border-slate-300 bg-white">
+                    <div class="absolute left-0 right-0 top-1/2 border-t-2 border-slate-400"></div>
+                    <div class="absolute left-0 right-0 top-[33%] border-t border-dashed border-orange-400"></div>
+                    <div class="grid grid-rows-2">
+                      {layout.map((row) => (
+                        <div class="grid grid-cols-3 min-h-[120px]">
+                          {row.map((slot) => {
+                            const player = playerMap.get(rotation.courtPlayerIds[slot])
+                            const isSetter = rotation.setterId === rotation.courtPlayerIds[slot]
+                            return (
+                              <div class={`m-1 rounded-lg border bg-white p-2 text-center text-xs ${isSetter ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}>
+                                <div class="text-[10px] font-semibold text-slate-400">{['RB', 'CB', 'LB', 'LF', 'CF', 'RF'][slot]}</div>
+                                <div class="mt-1 font-bold text-slate-900">#{player?.number ?? '?'}</div>
+                                <div class="truncate text-slate-600">{player?.name ?? '未登録'}</div>
+                                <div class="text-[10px] text-slate-400">{player?.position ?? ''}{isSetter ? ' / S' : ''}</div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <p class="mt-2 text-[11px] text-slate-500">点線はアタックライン（3mライン）。サーブ順位置とサーブ後守備位置は別物です。</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <aside class="card p-4">
+          <h2 class="text-sm font-semibold text-slate-900 mb-3">ローテ別メモ</h2>
+          <div class="space-y-4">
+            {ROTATION_KEYS.map((key) => {
+              const rotation = planData.rotations[key]
+              return (
+                <div class="rotation-editor hidden space-y-2" data-editor={key}>
+                  <div class="text-sm font-bold text-slate-800">{key}</div>
+                  <label class="block">
+                    <span class="block text-xs font-medium text-slate-600 mb-1">主に確認する局面</span>
+                    <select class="field-input rotation-primary" data-rotation={key}>
+                      {['unknown', 'receive', 'serve', 'both'].map((value) => <option value={value} selected={rotation.primaryFocusPhase === value}>{value}</option>)}
+                    </select>
+                  </label>
+                  <label class="block">
+                    <span class="block text-xs font-medium text-slate-600 mb-1">keyPoint</span>
+                    <textarea class="field-input rotation-keypoint min-h-20" data-rotation={key}>{rotation.keyPoint}</textarea>
+                  </label>
+                  <label class="block">
+                    <span class="block text-xs font-medium text-slate-600 mb-1">avoidNote</span>
+                    <textarea class="field-input rotation-avoid min-h-20" data-rotation={key}>{rotation.avoidNote}</textarea>
+                  </label>
+                  <label class="block">
+                    <span class="block text-xs font-medium text-slate-600 mb-1">summaryNote</span>
+                    <textarea class="field-input rotation-summary min-h-20" data-rotation={key}>{rotation.summaryNote}</textarea>
+                  </label>
+
+                  <details class="rounded-lg border p-2" open={key === 'R1'}>
+                    <summary class="cursor-pointer text-xs font-bold text-slate-700">レシーブ時｜A/B/Cパス攻撃</summary>
+                    <div class="mt-3 space-y-3">
+                      {[
+                        ['good', 'Aパス'],
+                        ['medium', 'Bパス'],
+                        ['bad', 'Cパス'],
+                      ].map(([passKey, passLabel]) => (
+                        <div class="rounded-lg bg-slate-50 p-2">
+                          <div class="mb-2 text-xs font-semibold text-slate-700">{passLabel}</div>
+                          {[1, 2, 3].map((priority) => {
+                            const option = rotation.receivePhase.attackPlansByPassQuality[passKey].find((item) => item.priority === priority)
+                            return (
+                              <div class="mb-2 rounded border bg-white p-2">
+                                <div class="mb-2 text-[11px] font-bold text-slate-500">{priority}st</div>
+                                <div class="grid gap-2">
+                                  <input class="field-input attack-display" data-rotation={key} data-pass={passKey} data-priority={priority} placeholder="表示名（任意）" value={option?.displayName ?? ''} />
+                                  <select class="field-input attack-type" data-rotation={key} data-pass={passKey} data-priority={priority}>
+                                    <option value="">未設定</option>
+                                    {attackTypes.map(([value, label]) => <option value={value} selected={option?.attackType === value}>{label}</option>)}
+                                  </select>
+                                  <select class="field-input attack-attacker" data-rotation={key} data-pass={passKey} data-priority={priority}>
+                                    <option value="">攻撃者未設定</option>
+                                    {rotation.courtPlayerIds.map((playerId) => <option value={playerId} selected={option?.attackerId === playerId}>{playerLabel(playerId)}</option>)}
+                                  </select>
+                                  <select class="field-input attack-takeoff" data-rotation={key} data-pass={passKey} data-priority={priority}>
+                                    <option value="">踏切位置未設定</option>
+                                    {takeoffZones.map(([value, label]) => <option value={value} selected={option?.attackTakeoffZone === value}>{label}</option>)}
+                                  </select>
+                                  <select class="field-input attack-target" data-rotation={key} data-pass={passKey} data-priority={priority}>
+                                    <option value="">狙い未設定</option>
+                                    {targetZones.map(([value, label]) => <option value={value} selected={option?.attackTargetZone === value}>{label}</option>)}
+                                  </select>
+                                  <select class="field-input attack-intent" data-rotation={key} data-pass={passKey} data-priority={priority}>
+                                    <option value="">目的未設定</option>
+                                    {attackIntents.map(([value, label]) => <option value={value} selected={option?.intent === value}>{label}</option>)}
+                                  </select>
+                                  <textarea class="field-input attack-notes min-h-16" data-rotation={key} data-pass={passKey} data-priority={priority} placeholder="攻撃メモ">{option?.notes ?? ''}</textarea>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+
+                  <details class="rounded-lg border p-2">
+                    <summary class="cursor-pointer text-xs font-bold text-slate-700">自サーブ時｜サーブ・ブロック・守備</summary>
+                    <div class="mt-3 space-y-2">
+                      <label class="block">
+                        <span class="block text-xs font-medium text-slate-600 mb-1">サーブ狙い</span>
+                        <select class="field-input serve-target-type" data-rotation={key}>
+                          {serveTargets.map(([value, label]) => <option value={value} selected={rotation.servePhase.serveTarget.targetType === value}>{label}</option>)}
+                        </select>
+                      </label>
+                      <input class="field-input serve-target-label" data-rotation={key} placeholder="狙う選手・ゾーン" value={rotation.servePhase.serveTarget.playerLabel ?? rotation.servePhase.serveTarget.zone ?? ''} />
+                      <textarea class="field-input serve-notes min-h-16" data-rotation={key} placeholder="サーブメモ">{rotation.servePhase.serveTarget.notes || rotation.servePhase.notes}</textarea>
+                      <div class="grid gap-2 sm:grid-cols-2">
+                        <label class="block">
+                          <span class="block text-xs font-medium text-slate-600 mb-1">ブロックシステム</span>
+                          <select class="field-input block-system" data-rotation={key}>
+                            {blockSystems.map(([value, label]) => <option value={value} selected={rotation.defensePhase.blockPlan.blockSystem === value}>{label}</option>)}
+                          </select>
+                        </label>
+                        <label class="block">
+                          <span class="block text-xs font-medium text-slate-600 mb-1">ブロック重点</span>
+                          <select class="field-input block-focus" data-rotation={key}>
+                            <option value="">未設定</option>
+                            {blockFocuses.map(([value, label]) => <option value={value} selected={rotation.defensePhase.blockPlan.blockFocus === value}>{label}</option>)}
+                          </select>
+                        </label>
+                      </div>
+                      <select class="field-input block-main" data-rotation={key}>
+                        <option value="">メインブロッカー未設定</option>
+                        {rotation.courtPlayerIds.map((playerId) => <option value={playerId} selected={rotation.defensePhase.blockPlan.mainBlockerId === playerId}>{playerLabel(playerId)}</option>)}
+                      </select>
+                      <textarea class="field-input block-notes min-h-16" data-rotation={key} placeholder="ブロックメモ">{rotation.defensePhase.blockPlan.notes}</textarea>
+                      <textarea class="field-input floor-defense-notes min-h-16" data-rotation={key} placeholder="フロア守備メモ">{rotation.defensePhase.floorDefensePlan.notes}</textarea>
+                      <textarea class="field-input cover-notes min-h-16" data-rotation={key} placeholder="カバーメモ">{rotation.defensePhase.coverPlan.notes}</textarea>
+                    </div>
+                  </details>
+
+                  <details class="rounded-lg border p-2">
+                    <summary class="cursor-pointer text-xs font-bold text-slate-700">ラリー中｜チャンス・二段・セッター1本目</summary>
+                    <div class="mt-3 space-y-2">
+                      <textarea class="field-input chance-notes min-h-16" data-rotation={key} placeholder="チャンスボール設計">{rotation.chanceBallPlan.notes}</textarea>
+                      <textarea class="field-input out-system-notes min-h-16" data-rotation={key} placeholder="崩れた時・二段トス">{rotation.outOfSystemPlan.notes}</textarea>
+                      <textarea class="field-input setter-first-notes min-h-16" data-rotation={key} placeholder="セッターが1本目を取った時">{rotation.setterFirstTouchPlan.notes}</textarea>
+                      <textarea class="field-input rally-notes min-h-16" data-rotation={key} placeholder="ラリー中の移行メモ">{rotation.rallyTransition.notes}</textarea>
+                    </div>
+                  </details>
+                </div>
+              )
+            })}
+          </div>
+        </aside>
+      </section>
+
+      <section class="card p-4">
+        <h2 class="text-sm font-semibold text-slate-900">相手情報・全体メモ</h2>
+        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+          <label class="block">
+            <span class="block text-xs font-medium text-slate-600 mb-1">狙うレシーバー</span>
+            <input id="scout-weak-receivers" class="field-input" value={planData.opponentScout.weakReceivers} />
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-slate-600 mb-1">避ける選手・リベロ</span>
+            <input id="scout-avoid-player" class="field-input" value={planData.opponentScout.avoidPlayer} />
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-slate-600 mb-1">ターゲット選手</span>
+            <input id="scout-target-player" class="field-input" value={planData.opponentScout.targetPlayer} />
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-slate-600 mb-1">相手セッター状態</span>
+            <select id="scout-setter-state" class="field-input">
+              {['unknown', 'front', 'back'].map((value) => <option value={value} selected={planData.opponentScout.opponentSetterState === value}>{value}</option>)}
+            </select>
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-slate-600 mb-1">ブロックが低い場所</span>
+            <input id="scout-weak-block-zone" class="field-input" value={planData.opponentScout.weakBlockZone} />
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-slate-600 mb-1">相手の苦手ローテ</span>
+            <input id="scout-weak-rotation" class="field-input" value={planData.opponentScout.weakRotationNote} />
+          </label>
+          <label class="block sm:col-span-2">
+            <span class="block text-xs font-medium text-slate-600 mb-1">全体メモ</span>
+            <textarea id="plan-notes" class="field-input min-h-24">{planData.notes}</textarea>
+          </label>
+          <label class="block sm:col-span-2">
+            <span class="block text-xs font-medium text-slate-600 mb-1">コーチ専用メモ</span>
+            <textarea id="plan-private-notes" class="field-input min-h-24">{planData.privateNotes}</textarea>
+          </label>
+        </div>
+      </section>
+
+      <section class="grid gap-4 lg:grid-cols-2">
+        <div class="card p-4">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <h2 class="text-sm font-semibold text-slate-900">共有・印刷</h2>
+              <p class="mt-1 text-xs text-slate-500">共有リンクはfinalizedの作戦プランのみ発行できます。</p>
+            </div>
+            <div class="flex gap-2">
+              <a href={`/teams/${teamId}/strategy/${planId}/player`} class="btn-secondary text-xs px-3 py-2">選手表示</a>
+              <a href={`/teams/${teamId}/strategy/${planId}/print`} class="btn-secondary text-xs px-3 py-2">印刷表示</a>
+            </div>
+          </div>
+          <div class="mt-3 rounded-lg border bg-slate-50 p-3" data-share-controls>
+            <div class="grid gap-2 sm:grid-cols-2">
+              <label class="block">
+                <span class="block text-xs font-medium text-slate-600 mb-1">共有パスワード</span>
+                <input id="share-password" data-ignore-dirty="true" type="password" class="field-input text-xs" minlength="4" placeholder="任意・4文字以上" />
+              </label>
+              <label class="block">
+                <span class="block text-xs font-medium text-slate-600 mb-1">期限</span>
+                <input id="share-expires" data-ignore-dirty="true" type="datetime-local" class="field-input text-xs" />
+              </label>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-3 text-xs text-slate-700">
+              <label class="inline-flex items-center gap-1.5">
+                <input id="share-allow-download" data-ignore-dirty="true" type="checkbox" class="h-4 w-4" />
+                ダウンロード許可
+              </label>
+              <label class="inline-flex items-center gap-1.5">
+                <input id="share-include-scout" data-ignore-dirty="true" type="checkbox" class="h-4 w-4" />
+                full共有に相手分析を含める
+              </label>
+            </div>
+            <div class="mt-3 grid gap-2 sm:grid-cols-4">
+              {(['full', 'player', 'print', 'summary'] as const).map((scope) => (
+                <button type="button" class="share-create rounded-lg border bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50" data-scope={scope} disabled={plan.status !== 'finalized' || !canEdit}>
+                  {scopeLabels[scope]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div id="share-message" class="mt-3 hidden rounded-lg border border-blue-100 bg-blue-50 p-2 text-xs text-blue-800"></div>
+          <div class="mt-3 space-y-3">
+            {shareLinkViews.length === 0 ? (
+              <p class="text-xs text-slate-500">共有リンクはまだありません。</p>
+            ) : shareLinkViews.map((link) => (
+              <div class={`rounded-lg border p-3 text-xs ${link.active ? 'bg-white' : 'bg-slate-50'}`}>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="font-semibold">{scopeLabels[link.viewScope as keyof typeof scopeLabels] ?? link.viewScope}</span>
+                      <span class={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${link.active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>{link.statusLabel}</span>
+                      {link.passwordProtected && <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">パスワード</span>}
+                    </div>
+                    <div class="mt-1 break-all text-slate-500">{link.url}</div>
+                    <div class="mt-1 text-slate-500">
+                      {link.expiresAt ? `期限: ${new Date(link.expiresAt).toLocaleString('ja-JP')}` : '期限なし'}
+                      {' / '}
+                      DL: {link.allowDownload ? '可' : '不可'}
+                      {' / '}
+                      相手分析: {link.includeOpponentScout ? '含む' : '含めない'}
+                    </div>
+                  </div>
+                  <div class="shrink-0 rounded border bg-white p-1 [&_svg]:h-24 [&_svg]:w-24" set:html={link.qrSvg}></div>
+                </div>
+                <div class="mt-3 grid gap-2 sm:grid-cols-2" data-share-controls>
+                  <input data-ignore-dirty="true" class="share-url field-input text-xs" value={link.url} readonly />
+                  <div class="flex flex-wrap gap-2">
+                    <a class="btn-secondary px-3 py-2 text-xs" href={link.path} target="_blank">開く</a>
+                    <button type="button" class="share-copy btn-secondary px-3 py-2 text-xs" data-url={link.url}>コピー</button>
+                    <button type="button" class="share-regenerate btn-secondary px-3 py-2 text-xs disabled:opacity-50" data-share={link.id} disabled={!canEdit}>再発行</button>
+                    <button type="button" class="share-revoke rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50" data-share={link.id} disabled={!canEdit || !link.active}>無効化</button>
+                  </div>
+                </div>
+                <div class="mt-3 grid gap-2 sm:grid-cols-2" data-share-controls>
+                  <label class="block">
+                    <span class="block text-[11px] font-medium text-slate-600 mb-1">期限</span>
+                    <input data-ignore-dirty="true" class="share-expires field-input text-xs" data-share={link.id} type="datetime-local" value={link.expiresAtLocal} />
+                  </label>
+                  <label class="block">
+                    <span class="block text-[11px] font-medium text-slate-600 mb-1">新しいパスワード</span>
+                    <input data-ignore-dirty="true" class="share-password field-input text-xs" data-share={link.id} type="password" minlength="4" placeholder="変更時のみ入力" />
+                  </label>
+                  <div class="flex flex-wrap gap-3 text-slate-700">
+                    <label class="inline-flex items-center gap-1.5">
+                      <input data-ignore-dirty="true" class="share-enabled h-4 w-4" data-share={link.id} type="checkbox" checked={link.enabled && !link.revokedAt} disabled={Boolean(link.revokedAt)} />
+                      有効
+                    </label>
+                    <label class="inline-flex items-center gap-1.5">
+                      <input data-ignore-dirty="true" class="share-allow-download h-4 w-4" data-share={link.id} type="checkbox" checked={link.allowDownload} />
+                      ダウンロード許可
+                    </label>
+                    <label class="inline-flex items-center gap-1.5">
+                      <input data-ignore-dirty="true" class="share-include-scout h-4 w-4" data-share={link.id} type="checkbox" checked={link.includeOpponentScout} disabled={link.viewScope !== 'full'} />
+                      相手分析
+                    </label>
+                    <label class="inline-flex items-center gap-1.5">
+                      <input data-ignore-dirty="true" class="share-clear-password h-4 w-4" data-share={link.id} type="checkbox" disabled={!link.passwordProtected} />
+                      パスワード解除
+                    </label>
+                  </div>
+                  <button type="button" class="share-update btn-secondary px-3 py-2 text-xs disabled:opacity-50" data-share={link.id} disabled={!canEdit || Boolean(link.revokedAt)}>設定を保存</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div class="mt-3 rounded-lg border p-2">
+            <div class="text-xs font-semibold text-slate-700">試合・セットにsnapshotを紐づけ</div>
+            <div class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_92px]">
+              <select id="snapshot-match" class="field-input text-xs">
+                <option value="">試合未選択</option>
+                {teamMatches.map((match) => (
+                  <option value={match.id}>{match.matchDate} vs {match.opponentName}</option>
+                ))}
+              </select>
+              <select id="snapshot-set" class="field-input text-xs">
+                {[1, 2, 3, 4, 5].map((n) => <option value={n} selected={planData.setNumber === n}>第{n}</option>)}
+              </select>
+            </div>
+            <button id="create-snapshot" type="button" class="btn-secondary mt-2 w-full text-xs py-2" disabled={!canEdit}>snapshotを作成</button>
+          </div>
+          <div class="mt-3 rounded-lg border p-2">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <div class="text-xs font-semibold text-slate-700">LINE/Slack向けサマリー</div>
+                <div class="mt-0.5 text-[11px] text-slate-500">privateNotes、相手分析、権限情報は含めません。</div>
+              </div>
+              <button id="copy-share-summary" type="button" class="btn-secondary px-3 py-2 text-xs">コピー</button>
+            </div>
+            <textarea id="share-summary-text" data-ignore-dirty="true" class="field-input mt-2 min-h-40 text-xs" readonly>{shareSummaryText}</textarea>
+          </div>
+        </div>
+
+        <div class="card p-4">
+          <h2 class="text-sm font-semibold text-slate-900">変更履歴</h2>
+          <p class="mt-1 text-xs text-slate-500">保存ボタン単位で履歴を残します。復元も履歴に記録されます。</p>
+          <div class="mt-3 max-h-52 space-y-2 overflow-auto">
+            {revisions.length === 0 ? (
+              <p class="text-xs text-slate-500">変更履歴はまだありません。</p>
+            ) : revisions.map((revision) => (
+              <div class="rounded-lg border p-2 text-xs">
+                <div class="font-semibold">{revision.summary}</div>
+                <div class="text-slate-500">{new Date(revision.editedAt).toLocaleString('ja-JP')}</div>
+                <button type="button" class="revision-restore mt-2 text-blue-700 underline disabled:text-slate-400" data-revision={revision.id} disabled={!canManage}>この版へ復元</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="validation-panel" class="hidden rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"></section>
+
+      <div class="sticky bottom-0 z-10 flex gap-2 rounded-t-xl border bg-white p-3 shadow-lg">
+        <button id="save-plan" class="btn-primary flex-1 py-2.5" disabled={!canEdit}>保存</button>
+        <button id="duplicate-plan" class="btn-secondary flex-1 py-2.5" disabled={!canEdit}>複製</button>
+        <button id="delete-plan" class="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 disabled:opacity-50" disabled={!canManage}>削除</button>
+        <a href={`/teams/${teamId}/strategy`} class="btn-secondary flex-1 py-2.5 text-center">一覧へ戻る</a>
+      </div>
+    </main>
+  </div>
+</Base>
+
+<script define:vars={{ teamId, planId, initialData: planData }}>
+  let planData = structuredClone(initialData)
+  let activeRotation = 'R1'
+  const dirtyBadge = document.getElementById('dirty-badge')
+
+  function markDirty() {
+    dirtyBadge?.classList.remove('hidden')
+  }
+
+  function showRotation(key) {
+    activeRotation = key
+    document.querySelectorAll('.rotation-court').forEach((el) => el.classList.toggle('hidden', el.dataset.court !== key))
+    document.querySelectorAll('.rotation-editor').forEach((el) => el.classList.toggle('hidden', el.dataset.editor !== key))
+    document.querySelectorAll('.rotation-tab').forEach((el) => {
+      const active = el.dataset.rotation === key
+      el.classList.toggle('bg-blue-50', active)
+      el.classList.toggle('border-blue-400', active)
+      el.classList.toggle('text-blue-700', active)
+    })
+  }
+
+  document.querySelectorAll('.rotation-tab').forEach((button) => {
+    button.addEventListener('click', () => showRotation(button.dataset.rotation))
+  })
+
+  document.querySelectorAll('input, select, textarea').forEach((input) => {
+    if (input.dataset.ignoreDirty === 'true') return
+    input.addEventListener('input', markDirty)
+    input.addEventListener('change', markDirty)
+  })
+
+  function getField(selector) {
+    return document.querySelector(selector)?.value ?? ''
+  }
+
+  function collectAttackOptions(rotationKey, passKey) {
+    return [1, 2, 3].map((priority) => {
+      const base = `.attack-type[data-rotation="${rotationKey}"][data-pass="${passKey}"][data-priority="${priority}"]`
+      const attackType = getField(base)
+      if (!attackType) return null
+      const option = {
+        priority,
+        attackType,
+        notes: getField(`.attack-notes[data-rotation="${rotationKey}"][data-pass="${passKey}"][data-priority="${priority}"]`),
+      }
+      const displayName = getField(`.attack-display[data-rotation="${rotationKey}"][data-pass="${passKey}"][data-priority="${priority}"]`)
+      const attackerId = getField(`.attack-attacker[data-rotation="${rotationKey}"][data-pass="${passKey}"][data-priority="${priority}"]`)
+      const attackTakeoffZone = getField(`.attack-takeoff[data-rotation="${rotationKey}"][data-pass="${passKey}"][data-priority="${priority}"]`)
+      const attackTargetZone = getField(`.attack-target[data-rotation="${rotationKey}"][data-pass="${passKey}"][data-priority="${priority}"]`)
+      const intent = getField(`.attack-intent[data-rotation="${rotationKey}"][data-pass="${passKey}"][data-priority="${priority}"]`)
+      if (displayName) option.displayName = displayName
+      if (attackerId) option.attackerId = attackerId
+      if (attackTakeoffZone) option.attackTakeoffZone = attackTakeoffZone
+      if (attackTargetZone) option.attackTargetZone = attackTargetZone
+      if (intent) option.intent = intent
+      return option
+    }).filter(Boolean)
+  }
+
+  function collectData() {
+    planData.name = document.getElementById('plan-name').value
+    planData.status = document.getElementById('plan-status').value
+    planData.opponentName = document.getElementById('plan-opponent').value
+    planData.setNumber = document.getElementById('plan-set').value ? Number(document.getElementById('plan-set').value) : null
+    planData.startingRotationKey = document.getElementById('plan-starting-rotation').value || null
+    planData.initialServingTeam = document.getElementById('plan-serving-team').value
+    planData.systemType = document.getElementById('plan-system').value
+
+    document.querySelectorAll('.rotation-primary').forEach((input) => {
+      planData.rotations[input.dataset.rotation].primaryFocusPhase = input.value
+    })
+    document.querySelectorAll('.rotation-keypoint').forEach((input) => {
+      planData.rotations[input.dataset.rotation].keyPoint = input.value
+    })
+    document.querySelectorAll('.rotation-avoid').forEach((input) => {
+      planData.rotations[input.dataset.rotation].avoidNote = input.value
+    })
+    document.querySelectorAll('.rotation-summary').forEach((input) => {
+      planData.rotations[input.dataset.rotation].summaryNote = input.value
+    })
+    for (const rotationKey of ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']) {
+      const rotation = planData.rotations[rotationKey]
+      rotation.receivePhase.attackPlansByPassQuality.good = collectAttackOptions(rotationKey, 'good')
+      rotation.receivePhase.attackPlansByPassQuality.medium = collectAttackOptions(rotationKey, 'medium')
+      rotation.receivePhase.attackPlansByPassQuality.bad = collectAttackOptions(rotationKey, 'bad')
+
+      const serveTargetType = getField(`.serve-target-type[data-rotation="${rotationKey}"]`)
+      const serveTargetLabel = getField(`.serve-target-label[data-rotation="${rotationKey}"]`)
+      const serveNotes = getField(`.serve-notes[data-rotation="${rotationKey}"]`)
+      rotation.servePhase.serveTarget = {
+        targetType: serveTargetType || 'safe_in',
+        playerLabel: serveTargetLabel || undefined,
+        notes: serveNotes,
+      }
+      rotation.servePhase.notes = serveNotes
+
+      rotation.defensePhase.blockPlan.blockSystem = getField(`.block-system[data-rotation="${rotationKey}"]`) || 'read'
+      rotation.defensePhase.blockPlan.blockFocus = getField(`.block-focus[data-rotation="${rotationKey}"]`) || undefined
+      rotation.defensePhase.blockPlan.mainBlockerId = getField(`.block-main[data-rotation="${rotationKey}"]`) || undefined
+      rotation.defensePhase.blockPlan.notes = getField(`.block-notes[data-rotation="${rotationKey}"]`)
+      rotation.defensePhase.floorDefensePlan.notes = getField(`.floor-defense-notes[data-rotation="${rotationKey}"]`)
+      rotation.defensePhase.coverPlan.notes = getField(`.cover-notes[data-rotation="${rotationKey}"]`)
+      rotation.chanceBallPlan.notes = getField(`.chance-notes[data-rotation="${rotationKey}"]`)
+      rotation.outOfSystemPlan.notes = getField(`.out-system-notes[data-rotation="${rotationKey}"]`)
+      rotation.setterFirstTouchPlan.notes = getField(`.setter-first-notes[data-rotation="${rotationKey}"]`)
+      rotation.rallyTransition.notes = getField(`.rally-notes[data-rotation="${rotationKey}"]`)
+    }
+    planData.opponentScout.weakReceivers = document.getElementById('scout-weak-receivers').value
+    planData.opponentScout.avoidPlayer = document.getElementById('scout-avoid-player').value
+    planData.opponentScout.targetPlayer = document.getElementById('scout-target-player').value
+    planData.opponentScout.opponentSetterState = document.getElementById('scout-setter-state').value
+    planData.opponentScout.weakBlockZone = document.getElementById('scout-weak-block-zone').value
+    planData.opponentScout.weakRotationNote = document.getElementById('scout-weak-rotation').value
+    planData.notes = document.getElementById('plan-notes').value
+    planData.privateNotes = document.getElementById('plan-private-notes').value
+    return planData
+  }
+
+  document.getElementById('save-plan')?.addEventListener('click', async () => {
+    const status = document.getElementById('plan-status').value
+    const res = await fetch(`/api/teams/${teamId}/strategies/${planId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, data: collectData() }),
+    })
+    const json = await res.json()
+    const panel = document.getElementById('validation-panel')
+    if (res.ok) {
+      dirtyBadge?.classList.add('hidden')
+      if (panel) {
+        const warnings = json.warnings ?? []
+        panel.classList.toggle('hidden', warnings.length === 0)
+        panel.innerHTML = warnings.length ? `<strong>Warnings</strong><ul class="mt-1 list-disc pl-5">${warnings.map((w) => `<li>${w.message}</li>`).join('')}</ul>` : ''
+      }
+    } else if (panel) {
+      const errors = json.errors ?? [{ message: json.error ?? '保存できませんでした。' }]
+      panel.classList.remove('hidden')
+      panel.innerHTML = `<strong>保存できませんでした</strong><ul class="mt-1 list-disc pl-5">${errors.map((e) => `<li>${e.message}</li>`).join('')}</ul>`
+    }
+  })
+
+  document.getElementById('duplicate-plan')?.addEventListener('click', async () => {
+    const res = await fetch(`/api/teams/${teamId}/strategies/${planId}/duplicate`, { method: 'POST' })
+    const json = await res.json()
+    if (res.ok) location.href = `/teams/${teamId}/strategy/${json.id}`
+    else alert(json.error ?? '複製できませんでした。')
+  })
+
+  document.getElementById('delete-plan')?.addEventListener('click', async () => {
+    if (!confirm('この作戦プランを削除しますか？共有リンクも無効になります。')) return
+    const res = await fetch(`/api/teams/${teamId}/strategies/${planId}`, { method: 'DELETE' })
+    if (res.ok) location.href = `/teams/${teamId}/strategy`
+    else {
+      const json = await res.json()
+      alert(json.error ?? '削除できませんでした。')
+    }
+  })
+
+  function shareMessage(text, isError = false) {
+    const message = document.getElementById('share-message')
+    if (!message) return
+    message.classList.remove('hidden', 'border-blue-100', 'bg-blue-50', 'text-blue-800', 'border-red-100', 'bg-red-50', 'text-red-800')
+    message.classList.add(isError ? 'border-red-100' : 'border-blue-100', isError ? 'bg-red-50' : 'bg-blue-50', isError ? 'text-red-800' : 'text-blue-800')
+    message.textContent = text
+  }
+
+  function toIsoOrNull(value) {
+    return value ? new Date(value).toISOString() : null
+  }
+
+  function checked(selector) {
+    return Boolean(document.querySelector(selector)?.checked)
+  }
+
+  function value(selector) {
+    return document.querySelector(selector)?.value ?? ''
+  }
+
+  document.querySelectorAll('.share-copy').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const url = button.dataset.url
+      if (!url) return
+      await navigator.clipboard.writeText(url)
+      shareMessage('共有URLをコピーしました。')
+    })
+  })
+
+  document.getElementById('copy-share-summary')?.addEventListener('click', async () => {
+    const text = document.getElementById('share-summary-text')?.value ?? ''
+    await navigator.clipboard.writeText(text)
+    shareMessage('共有サマリーをコピーしました。')
+  })
+
+  document.querySelectorAll('.share-create').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const scope = button.dataset.scope
+      const password = value('#share-password')
+      const expiresAt = toIsoOrNull(value('#share-expires'))
+      const res = await fetch(`/api/teams/${teamId}/strategies/${planId}/share-links`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          viewScope: scope,
+          ...(password ? { password } : {}),
+          expiresAt,
+          allowDownload: checked('#share-allow-download') || scope === 'print',
+          includeOpponentScout: scope === 'full' && checked('#share-include-scout'),
+        }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        shareMessage(`共有リンクを作成しました: ${json.url}`)
+        location.reload()
+      } else {
+        shareMessage(json.error ?? '共有リンクを作成できませんでした。', true)
+      }
+    })
+  })
+
+  document.querySelectorAll('.share-update').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const shareId = button.dataset.share
+      const password = value(`.share-password[data-share="${shareId}"]`)
+      const clearPassword = checked(`.share-clear-password[data-share="${shareId}"]`)
+      const body = {
+        enabled: checked(`.share-enabled[data-share="${shareId}"]`),
+        expiresAt: toIsoOrNull(value(`.share-expires[data-share="${shareId}"]`)),
+        allowDownload: checked(`.share-allow-download[data-share="${shareId}"]`),
+        includeOpponentScout: checked(`.share-include-scout[data-share="${shareId}"]`),
+      }
+      if (password) body.password = password
+      if (clearPassword) body.password = null
+
+      const res = await fetch(`/api/teams/${teamId}/strategies/${planId}/share-links/${shareId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        shareMessage('共有リンク設定を保存しました。')
+        location.reload()
+      } else {
+        shareMessage(json.error ?? '共有リンク設定を保存できませんでした。', true)
+      }
+    })
+  })
+
+  document.querySelectorAll('.share-regenerate').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const shareId = button.dataset.share
+      const res = await fetch(`/api/teams/${teamId}/strategies/${planId}/share-links/${shareId}/regenerate`, { method: 'POST' })
+      const json = await res.json()
+      if (res.ok) {
+        alert(`共有リンクを再発行しました: ${json.url}`)
+        location.reload()
+      } else {
+        alert(json.error ?? '共有リンクを再発行できませんでした。')
+      }
+    })
+  })
+
+  document.querySelectorAll('.share-revoke').forEach((button) => {
+    button.addEventListener('click', async () => {
+      if (!confirm('この共有リンクを無効化しますか？古いQRやURLからは見られなくなります。')) return
+      const shareId = button.dataset.share
+      const res = await fetch(`/api/teams/${teamId}/strategies/${planId}/share-links/${shareId}`, { method: 'DELETE' })
+      if (res.ok) location.reload()
+      else {
+        const json = await res.json()
+        alert(json.error ?? '共有リンクを無効化できませんでした。')
+      }
+    })
+  })
+
+  document.getElementById('create-snapshot')?.addEventListener('click', async () => {
+    const matchId = document.getElementById('snapshot-match')?.value || null
+    const setNumber = document.getElementById('snapshot-set')?.value ? Number(document.getElementById('snapshot-set').value) : planData.setNumber
+    const res = await fetch(`/api/teams/${teamId}/strategies/${planId}/snapshots`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matchId, setNumber }),
+    })
+    const json = await res.json()
+    if (res.ok) alert(`snapshotを作成しました: ${json.id}`)
+    else alert(json.error ?? 'snapshotを作成できませんでした。')
+  })
+
+  document.querySelectorAll('.revision-restore').forEach((button) => {
+    button.addEventListener('click', async () => {
+      if (!confirm('この変更履歴の内容へ復元しますか？現在の内容は復元操作として履歴に残ります。')) return
+      const revisionId = button.dataset.revision
+      const res = await fetch(`/api/teams/${teamId}/strategies/${planId}/revisions/${revisionId}/restore`, { method: 'POST' })
+      if (res.ok) location.reload()
+      else {
+        const json = await res.json()
+        alert(json.error ?? '復元できませんでした。')
+      }
+    })
+  })
+
+  showRotation(activeRotation)
+</script>
