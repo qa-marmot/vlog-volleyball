@@ -31,12 +31,20 @@ function makePlan() {
 }
 
 describe('generateRotationsFromBase', () => {
-  it('R1からR6まで右シフトの仮定義で生成する', () => {
+  it('R1からR6まで時計回りのslot変換で生成する', () => {
     const rotations = generateRotationsFromBase(baseRotation, ['p1'])
 
     expect(rotations.R1.courtPlayerIds).toEqual(['p1', 'p2', 'p3', 'p4', 'p5', 'p6'])
     expect(rotations.R2.courtPlayerIds).toEqual(['p6', 'p1', 'p2', 'p3', 'p4', 'p5'])
     expect(rotations.R3.courtPlayerIds).toEqual(['p5', 'p6', 'p1', 'p2', 'p3', 'p4'])
+    expect(rotations.R6.courtPlayerIds).toEqual(['p2', 'p3', 'p4', 'p5', 'p6', 'p1'])
+  })
+
+  it('R1からR2はRFがRBに入り、後衛と前衛が時計回りに進む', () => {
+    const [rb, cb, lb, lf, cf, rf] = baseRotation
+    const rotations = generateRotationsFromBase(baseRotation, ['p1'])
+
+    expect(rotations.R2.courtPlayerIds).toEqual([rf, rb, cb, lb, lf, cf])
   })
 
   it('単一セッターなら全ローテにsetterIdを設定する', () => {

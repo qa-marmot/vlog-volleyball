@@ -106,6 +106,17 @@ export const strategyPlans = sqliteTable('strategy_plans', {
   deletedAt: text('deleted_at'),
 })
 
+export const strategyRoles = sqliteTable('strategy_roles', {
+  id: text('id').primaryKey(),
+  teamId: text('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  role: text('role', { enum: ['owner', 'editor', 'viewer'] }).notNull(),
+  createdBy: text('created_by').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  updatedBy: text('updated_by').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
 export const strategyShareLinks = sqliteTable('strategy_share_links', {
   id: text('id').primaryKey(),
   strategyPlanId: text('strategy_plan_id').notNull().references(() => strategyPlans.id, { onDelete: 'cascade' }),

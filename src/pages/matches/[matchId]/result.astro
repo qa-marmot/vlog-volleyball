@@ -27,6 +27,28 @@ const strategySnapshotRows = await db.select().from(strategySnapshots).where(eq(
 const strategyReviewRows = await db.select().from(matchSetStrategyReviews).where(eq(matchSetStrategyReviews.matchId, matchId))
 const reviewBySet = new Map(strategyReviewRows.map((review) => [review.setNumber, review]))
 
+function parseStrategySnapshot(snapshot: string) {
+  try {
+    return JSON.parse(snapshot) as {
+      startingRotationKey?: string | null
+      initialServingTeam?: string
+      autoSummaries?: Record<string, string>
+      notes?: string
+    }
+  } catch {
+    return {}
+  }
+}
+
+function parseRotationReviews(rotationReviews: string) {
+  try {
+    const parsed = JSON.parse(rotationReviews) as Array<{ rotationKey: string; note: string }>
+    return new Map(parsed.map((review) => [review.rotationKey, review.note]))
+  } catch {
+    return new Map<string, string>()
+  }
+}
+
 // Map to snake_case for React components and utils
 const setsForClient: MatchSet[] = dbSets.map((s) => ({
   id: s.id,
@@ -96,11 +118,26 @@ stats.scoreTimeline = computeTimelineWithSets(
             {strategySnapshotRows.map((snapshot) => {
               const review = reviewBySet.get(snapshot.setNumber ?? 0)
               const parsedReview = review ? JSON.parse(review.postMatchReview) : {}
+              const rotationReviewMap = review ? parseRotationReviews(review.rotationReviews) : new Map<string, string>()
+              const parsedSnapshot = parseStrategySnapshot(snapshot.snapshot)
+              const autoSummaries = parsedSnapshot.autoSummaries ?? {}
               return (
                 <div class="rounded-lg border p-3">
                   <div class="flex items-center justify-between gap-2">
                     <div class="text-sm font-bold text-slate-800">第{snapshot.setNumber ?? '-'}セット</div>
                     <div class="text-[11px] text-slate-500">snapshot: {snapshot.id.slice(0, 8)}</div>
+                  </div>
+                  <div class="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
+                    <div class="flex flex-wrap gap-x-3 gap-y-1 font-semibold">
+                      <span>開始ローテ: {parsedSnapshot.startingRotationKey ?? '未設定'}</span>
+                      <span>開始サーブ: {parsedSnapshot.initialServingTeam ?? 'unknown'}</span>
+                    </div>
+                    <div class="mt-2 grid gap-1">
+                      {Object.entries(autoSummaries).map(([rotationKey, summary]) => (
+                        <div><span class="font-semibold">{rotationKey}</span>: {summary}</div>
+                      ))}
+                    </div>
+                    {parsedSnapshot.notes && <div class="mt-2 whitespace-pre-wrap text-slate-600">{parsedSnapshot.notes}</div>}
                   </div>
                   <div class="mt-2 grid gap-2">
                     <textarea class="field-input review-worked min-h-16" data-set={snapshot.setNumber} data-snapshot={snapshot.id} data-plan={snapshot.strategyPlanId} placeholder="うまくいったこと">{parsedReview.workedWell ?? ''}</textarea>
@@ -108,6 +145,17 @@ stats.scoreTimeline = computeTimelineWithSets(
                     <textarea class="field-input review-execution min-h-16" data-set={snapshot.setNumber} data-snapshot={snapshot.id} data-plan={snapshot.strategyPlanId} placeholder="実行メモ">{parsedReview.executionNotes ?? ''}</textarea>
                     <textarea class="field-input review-next min-h-16" data-set={snapshot.setNumber} data-snapshot={snapshot.id} data-plan={snapshot.strategyPlanId} placeholder="次回調整">{parsedReview.nextAdjustments ?? ''}</textarea>
                     <textarea class="field-input review-opponent min-h-16" data-set={snapshot.setNumber} data-snapshot={snapshot.id} data-plan={snapshot.strategyPlanId} placeholder="実際の相手傾向">{parsedReview.opponentActualTendencies ?? ''}</textarea>
+                    <div class="rounded-lg border bg-white p-2">
+                      <div class="mb-2 text-xs font-semibold text-slate-700">ローテ別レビュー</div>
+                      <div class="grid gap-2 sm:grid-cols-2">
+                        {['R1', 'R2', 'R3', 'R4', 'R5', 'R6'].map((rotationKey) => (
+                          <label class="block">
+                            <span class="block text-[11px] font-semibold text-slate-500 mb-1">{rotationKey}</span>
+                            <textarea class="field-input rotation-review min-h-16 text-xs" data-set={snapshot.setNumber} data-rotation={rotationKey} placeholder={`${rotationKey}の実行メモ`}>{rotationReviewMap.get(rotationKey) ?? ''}</textarea>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                     <button type="button" class="save-strategy-review btn-secondary text-xs py-2" data-set={snapshot.setNumber} data-snapshot={snapshot.id} data-plan={snapshot.strategyPlanId}>振り返りを保存</button>
                   </div>
                 </div>
@@ -136,6 +184,15 @@ stats.scoreTimeline = computeTimelineWithSets(
     return document.querySelector(selector)?.value ?? ''
   }
 
+  function collectRotationReviews(setNumber) {
+    return ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']
+      .map((rotationKey) => ({
+        rotationKey,
+        note: valueFor(`.rotation-review[data-set="${setNumber}"][data-rotation="${rotationKey}"]`),
+      }))
+      .filter((review) => review.note.trim().length > 0)
+  }
+
   document.querySelectorAll('.save-strategy-review').forEach((button) => {
     button.addEventListener('click', async () => {
       const setNumber = Number(button.dataset.set)
@@ -155,7 +212,7 @@ stats.scoreTimeline = computeTimelineWithSets(
             nextAdjustments: valueFor(`.review-next[data-set="${setNumber}"]`),
             opponentActualTendencies: valueFor(`.review-opponent[data-set="${setNumber}"]`),
           },
-          rotationReviews: [],
+          rotationReviews: collectRotationReviews(setNumber),
         }),
       })
       if (res.ok) alert('作戦振り返りを保存しました。')

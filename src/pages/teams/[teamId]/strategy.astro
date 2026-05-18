@@ -3,7 +3,7 @@ import Base from '../../../layouts/Base.astro'
 import { env } from 'cloudflare:workers'
 import { and, eq, isNull } from 'drizzle-orm'
 import { getDb } from '../../../lib/db'
-import { players, strategyPlans, teamMembers, teams } from '../../../schema'
+import { players, strategyPlans, strategyRoles, teamMembers, teams, users } from '../../../schema'
 
 const user = Astro.locals.user!
 const { teamId } = Astro.params as { teamId: string }
@@ -20,7 +20,23 @@ const teamPlayers = await db.select().from(players).where(eq(players.teamId, tea
 const nonLiberoPlayers = teamPlayers.filter((p) => !p.isLibero)
 const plans = await db.select().from(strategyPlans)
   .where(and(eq(strategyPlans.teamId, teamId), isNull(strategyPlans.deletedAt)))
-const canEdit = membership.role === 'owner'
+const explicitStrategyRole = await db.select().from(strategyRoles)
+  .where(and(eq(strategyRoles.teamId, teamId), eq(strategyRoles.userId, user.id))).get()
+const strategyRole = membership.role === 'owner' ? 'owner' : explicitStrategyRole?.role ?? 'viewer'
+const canEdit = strategyRole === 'owner' || strategyRole === 'editor'
+const canManageRoles = strategyRole === 'owner'
+const roleRows = canManageRoles
+  ? await db.select({
+    userId: teamMembers.userId,
+    teamRole: teamMembers.role,
+    email: users.email,
+    strategyRole: strategyRoles.role,
+  })
+    .from(teamMembers)
+    .innerJoin(users, eq(teamMembers.userId, users.id))
+    .leftJoin(strategyRoles, and(eq(strategyRoles.teamId, teamMembers.teamId), eq(strategyRoles.userId, teamMembers.userId)))
+    .where(eq(teamMembers.teamId, teamId))
+  : []
 ---
 <Base title={`${team.name} 作戦ボード`}>
   <div class="min-h-screen bg-slate-50">
@@ -136,6 +152,32 @@ const canEdit = membership.role === 'owner'
           <div class="card px-4 py-6 text-center text-sm text-slate-500">作戦プランはまだありません。</div>
         )}
       </section>
+
+      {canManageRoles && (
+        <section class="card p-4">
+          <h2 class="text-sm font-semibold text-slate-900">作戦ボード権限</h2>
+          <p class="mt-1 text-xs text-slate-500">チームownerは常に作戦ownerです。memberには作戦専用のowner/editor/viewerを設定できます。</p>
+          <div id="strategy-role-message" class="mt-3 hidden rounded-lg border border-blue-100 bg-blue-50 p-2 text-xs text-blue-800"></div>
+          <div class="mt-3 divide-y divide-slate-100 rounded-lg border">
+            {roleRows.map((row) => {
+              const effectiveRole = row.teamRole === 'owner' ? 'owner' : row.strategyRole ?? 'viewer'
+              return (
+                <div class="flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
+                  <div>
+                    <div class="font-medium text-slate-800">{row.email}</div>
+                    <div class="text-xs text-slate-500">team: {row.teamRole}</div>
+                  </div>
+                  <select class="strategy-role-select field-input w-36 text-xs" data-user={row.userId} disabled={row.teamRole === 'owner'}>
+                    {(['owner', 'editor', 'viewer'] as const).map((role) => (
+                      <option value={role} selected={effectiveRole === role}>{role}</option>
+                    ))}
+                  </select>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
     </main>
   </div>
 </Base>
@@ -143,6 +185,28 @@ const canEdit = membership.role === 'owner'
 <script define:vars={{ teamId }}>
   const form = document.getElementById('strategy-create-form')
   const error = document.getElementById('create-error')
+  const roleMessage = document.getElementById('strategy-role-message')
+
+  function showRoleMessage(text, isError = false) {
+    if (!roleMessage) return
+    roleMessage.classList.remove('hidden', 'border-blue-100', 'bg-blue-50', 'text-blue-800', 'border-red-100', 'bg-red-50', 'text-red-800')
+    roleMessage.classList.add(isError ? 'border-red-100' : 'border-blue-100', isError ? 'bg-red-50' : 'bg-blue-50', isError ? 'text-red-800' : 'text-blue-800')
+    roleMessage.textContent = text
+  }
+
+  document.querySelectorAll('.strategy-role-select').forEach((select) => {
+    select.addEventListener('change', async () => {
+      const userId = select.dataset.user
+      const res = await fetch(`/api/teams/${teamId}/strategies/roles/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: select.value }),
+      })
+      const data = await res.json()
+      if (res.ok) showRoleMessage('作戦ボード権限を更新しました。')
+      else showRoleMessage(data.error ?? '作戦ボード権限を更新できませんでした。', true)
+    })
+  })
 
   form?.addEventListener('submit', async (event) => {
     event.preventDefault()
