@@ -495,9 +495,14 @@ export function buildDefaultStrategyPlanData(params: {
   setNumber?: 1 | 2 | 3 | 4 | 5 | null
   baseRotation: string[]
   players: Array<{ id: string; position: string | null; isLibero: boolean }>
+  liberoPlayerIds?: string[]
 }): StrategyPlanData {
   const setterPlayerIds = params.players.filter((p) => p.position === 'S').map((p) => p.id).slice(0, 2)
-  const liberoPlayerIds = params.players.filter((p) => p.isLibero || p.position === 'L').map((p) => p.id).slice(0, 2)
+  const eligibleLiberoIds = params.players.filter((p) => p.isLibero || p.position === 'L').map((p) => p.id)
+  const requestedLiberoIds = params.liberoPlayerIds ?? []
+  const liberoPlayerIds = (requestedLiberoIds.length > 0
+    ? requestedLiberoIds.filter((id) => eligibleLiberoIds.includes(id))
+    : eligibleLiberoIds).slice(0, 2)
   const planPlayerRoles = params.players.map((p) => ({
     playerId: p.id,
     role: (p.isLibero ? 'L' : p.position ?? 'other') as z.infer<typeof PlayerRoleSchema>,

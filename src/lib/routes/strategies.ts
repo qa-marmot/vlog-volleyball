@@ -143,6 +143,7 @@ strategiesRoute.post('/', async (c) => {
     matchDate?: string
     setNumber?: 1 | 2 | 3 | 4 | 5 | null
     baseRotation: string[]
+    liberoPlayerIds?: string[]
     status?: StrategyStatus
   }>()
 
@@ -153,6 +154,7 @@ strategiesRoute.post('/', async (c) => {
     matchDate: body.matchDate,
     setNumber: body.setNumber ?? null,
     baseRotation: body.baseRotation,
+    liberoPlayerIds: body.liberoPlayerIds,
     players: teamPlayers,
   })
 
