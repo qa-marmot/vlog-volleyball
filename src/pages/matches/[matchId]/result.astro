@@ -118,7 +118,7 @@ stats.scoreTimeline = computeTimelineWithSets(
             {strategySnapshotRows.map((snapshot) => {
               const review = reviewBySet.get(snapshot.setNumber ?? 0)
               const parsedReview = review ? JSON.parse(review.postMatchReview) : {}
-              const rotationReviewMap = review ? parseRotationReviews(review.rotationReviews) : new Map<string, string>()
+              const rotationReviewMap = review ? parseRotationReviews(review.rotationReviews) : new Map()
               const parsedSnapshot = parseStrategySnapshot(snapshot.snapshot)
               const autoSummaries = parsedSnapshot.autoSummaries ?? {}
               return (
