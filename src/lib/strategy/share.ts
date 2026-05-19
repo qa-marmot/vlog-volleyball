@@ -60,6 +60,20 @@ function serveTargetLabel(rotation: RotationStrategy) {
   return target.targetType
 }
 
+function attackOptionView(data: StrategyPlanData, option: RotationStrategy['receivePhase']['attackPlansByPassQuality']['good'][number]) {
+  return {
+    priority: option.priority,
+    label: optionLabel(data, option),
+    attackerId: option.attackerId ?? '',
+    attackType: option.attackType,
+    attackTakeoffZone: option.attackTakeoffZone ?? '',
+    attackTargetZone: option.attackTargetZone ?? '',
+    tempo: option.tempo ?? '',
+    intent: option.intent ?? '',
+    notes: option.notes,
+  }
+}
+
 export function generateRotationSummary(data: StrategyPlanData, key: RotationKey) {
   const rotation = data.rotations[key]
   const attacks = rotation.receivePhase.attackPlansByPassQuality
@@ -122,6 +136,11 @@ export function projectStrategyForView(params: {
         good: optionLabel(data, rotation.receivePhase.attackPlansByPassQuality.good[0]),
         medium: optionLabel(data, rotation.receivePhase.attackPlansByPassQuality.medium[0]),
         bad: optionLabel(data, rotation.receivePhase.attackPlansByPassQuality.bad[0]),
+      },
+      receiveAttackOptions: {
+        good: scope === 'summary' ? [] : rotation.receivePhase.attackPlansByPassQuality.good.map((option) => attackOptionView(data, option)),
+        medium: scope === 'summary' ? [] : rotation.receivePhase.attackPlansByPassQuality.medium.map((option) => attackOptionView(data, option)),
+        bad: scope === 'summary' ? [] : rotation.receivePhase.attackPlansByPassQuality.bad.map((option) => attackOptionView(data, option)),
       },
       serveTarget: rotation.servePhase.serveTarget,
       blockPlan: rotation.defensePhase.blockPlan,
