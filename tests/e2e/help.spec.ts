@@ -40,4 +40,20 @@ test.describe('ヘルプページ', () => {
     const loginLink = page.locator('header').getByRole('link', { name: 'ログイン' })
     await expect(loginLink).toHaveAttribute('href', '/login')
   })
+
+  test('作戦ボードガイドへ移動できる', async ({ page }) => {
+    await page.goto('/help')
+    const guideLink = page.getByRole('link', { name: '作戦ボードガイド' })
+    await expect(guideLink).toHaveAttribute('href', '/help/strategy-board')
+    await guideLink.click()
+    await expect(page).toHaveURL(/\/help\/strategy-board$/)
+    await expect(page.locator('h1')).toContainText('ローテーション作戦ボードの使い方')
+  })
+
+  test('作戦ボードガイドの主要セクションが表示される', async ({ page }) => {
+    await page.goto('/help/strategy-board')
+    await expect(page.locator('body')).toContainText('1プラン = 1セット')
+    await expect(page.locator('body')).toContainText('共有範囲の選び方')
+    await expect(page.locator('body')).toContainText('よくあるミス')
+  })
 })
