@@ -41,6 +41,12 @@ const servingTeamLabels = {
   opponent: '相手',
   unknown: '未定',
 } as const
+const systemTypeLabels: Record<string, string> = {
+  '5-1': '5-1（セッター1人）',
+  '6-2': '6-2（セッター2人）',
+  '4-2': '4-2（セッター2人固定）',
+  other: 'その他',
+}
 const serveTargetLabels: Record<string, string> = {
   short: '短め',
   deep: '深め',
@@ -72,6 +78,50 @@ const opponentSetterStateLabels: Record<string, string> = {
   front: '前衛',
   back: '後衛',
   mixed: '混在',
+}
+const passQualityLabels = {
+  good: 'Aパス',
+  medium: 'Bパス',
+  bad: 'Cパス',
+} as const
+const takeoffZoneLabels: Record<string, string> = {
+  front_left: '前衛左',
+  front_middle: '前衛中央',
+  front_right: '前衛右',
+  back_left_behind_3m: '後衛左 3m後方',
+  back_middle_behind_3m: '後衛中央 3m後方',
+  back_right_behind_3m: '後衛右 3m後方',
+}
+const targetZoneLabels: Record<string, string> = {
+  front_left: '相手前左',
+  front_middle: '相手前中央',
+  front_right: '相手前右',
+  middle_left: '相手中左',
+  middle_center: '相手中中央',
+  middle_right: '相手中右',
+  back_left: '相手奥左',
+  back_middle: '相手奥中央',
+  back_right: '相手奥右',
+}
+const tempoLabels: Record<string, string> = {
+  first: '1stテンポ',
+  second: '2ndテンポ',
+  third: '3rdテンポ',
+  high: '高いトス',
+}
+const intentLabels: Record<string, string> = {
+  kill: '決定',
+  block_out: 'ブロックアウト',
+  tip: 'フェイント',
+  touch_out: 'ワンタッチ狙い',
+  course_shot: 'コース打ち',
+  recycle: 'つなぎ',
+  safe_return: '安全返球',
+  target_weak_blocker: '低いブロック狙い',
+  target_poor_defender: '弱い守備者狙い',
+  target_setter_area: 'セッター周辺狙い',
+  deep_corner: '奥角',
+  wipe_block: 'ブロック利用',
 }
 
 if (!link || !link.enabled || link.revokedAt || (link.expiresAt && new Date(link.expiresAt).getTime() <= Date.now())) {
@@ -123,6 +173,10 @@ function servingTeamLabel(value: string) {
   return servingTeamLabels[value as keyof typeof servingTeamLabels] ?? value
 }
 
+function systemTypeLabel(value: string) {
+  return systemTypeLabels[value] ?? value
+}
+
 function serveTargetText(rotation: NonNullable<typeof projected>['rotations'][number]) {
   const target = rotation.serveTarget
   const base = serveTargetLabels[target.targetType] ?? target.targetType
@@ -135,6 +189,50 @@ function blockPlanText(rotation: NonNullable<typeof projected>['rotations'][numb
   const system = blockSystemLabels[block.blockSystem] ?? block.blockSystem
   const focus = block.blockFocus ? (blockFocusLabels[block.blockFocus] ?? block.blockFocus) : ''
   return [system, focus].filter(Boolean).join(' / ') || '未設定'
+}
+
+function attackDetailText(option: NonNullable<typeof projected>['rotations'][number]['receiveAttackOptions']['good'][number]) {
+  const details = [
+    option.attackTakeoffZone ? `踏切: ${takeoffZoneLabels[option.attackTakeoffZone] ?? option.attackTakeoffZone}` : '',
+    option.attackTargetZone ? `狙い: ${targetZoneLabels[option.attackTargetZone] ?? option.attackTargetZone}` : '',
+    option.tempo ? `テンポ: ${tempoLabels[option.tempo] ?? option.tempo}` : '',
+    option.intent ? `意図: ${intentLabels[option.intent] ?? option.intent}` : '',
+  ].filter(Boolean)
+  return details.join(' / ')
+}
+
+function attackPatternsByPlayer(rotation: NonNullable<typeof projected>['rotations'][number]) {
+  const grouped = new Map<string, Array<{
+    passQuality: keyof typeof passQualityLabels
+    priority: number
+    label: string
+    detail: string
+    notes: string
+  }>>()
+
+  ;(['good', 'medium', 'bad'] as const).forEach((quality) => {
+    rotation.receiveAttackOptions[quality].forEach((option) => {
+      const playerId = option.attackerId || 'unassigned'
+      const list = grouped.get(playerId) ?? []
+      list.push({
+        passQuality: quality,
+        priority: option.priority,
+        label: option.label,
+        detail: attackDetailText(option),
+        notes: option.notes,
+      })
+      grouped.set(playerId, list)
+    })
+  })
+
+  return [...grouped.entries()].map(([playerId, options]) => ({
+    playerId,
+    playerName: playerId === 'unassigned' ? '担当未設定' : playerLabel(playerId),
+    options: options.sort((a, b) => {
+      const qualityOrder = { good: 0, medium: 1, bad: 2 } as const
+      return qualityOrder[a.passQuality] - qualityOrder[b.passQuality] || a.priority - b.priority
+    }),
+  }))
 }
 
 function scoutItems(scout: NonNullable<NonNullable<typeof projected>['opponentScout']>) {
@@ -191,7 +289,7 @@ function scoutItems(scout: NonNullable<NonNullable<typeof projected>['opponentSc
               </div>
               <div class="rounded-md bg-slate-50 p-2">
                 <dt class="font-semibold text-slate-500">システム</dt>
-                <dd class="mt-0.5 font-bold">{projected.systemType}</dd>
+                <dd class="mt-0.5 font-bold">{systemTypeLabel(projected.systemType)}</dd>
               </div>
               <div class="rounded-md bg-slate-50 p-2">
                 <dt class="font-semibold text-slate-500">共有範囲</dt>
@@ -284,6 +382,32 @@ function scoutItems(scout: NonNullable<NonNullable<typeof projected>['opponentSc
                       <div class="mt-1">{blockPlanText(rotation)}</div>
                     </div>
                   </div>
+                )}
+
+                {link.viewScope !== 'summary' && attackPatternsByPlayer(rotation).length > 0 && (
+                  <section class="mt-3 rounded-md border bg-slate-50 p-3">
+                    <h3 class="text-xs font-bold text-slate-700">選手別攻撃パターン</h3>
+                    <div class="mt-2 space-y-2">
+                      {attackPatternsByPlayer(rotation).map((playerAttack) => (
+                        <div class="rounded-md bg-white p-2">
+                          <div class="text-xs font-bold text-slate-900">{playerAttack.playerName}</div>
+                          <div class="mt-2 space-y-1.5">
+                            {playerAttack.options.map((option) => (
+                              <div class="rounded border border-slate-200 p-2 text-xs">
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                  <span class="rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700">{passQualityLabels[option.passQuality]}</span>
+                                  <span class="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">{option.priority}番手</span>
+                                  <span class="font-bold text-slate-900">{option.label}</span>
+                                </div>
+                                {option.detail && <div class="mt-1 leading-5 text-slate-600">{option.detail}</div>}
+                                {option.notes && <div class="mt-1 leading-5 text-slate-500">メモ: {option.notes}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
                 )}
 
                 {link.viewScope === 'full' && rotation.notes && (
