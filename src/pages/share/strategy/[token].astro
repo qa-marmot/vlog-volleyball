@@ -227,7 +227,7 @@ function scoutItems(scout: NonNullable<NonNullable<typeof projected>['opponentSc
                         {row.map((slot) => {
                           const playerId = rotation.courtPlayerIds[slot]
                           const isSetter = rotation.setterId === playerId
-                          const isBackRow = slot <= 2
+                          const isBackRow = [0, 1, 2].includes(slot)
                           return (
                             <div class={`min-h-20 border border-slate-200 p-2 text-center ${isSetter ? 'bg-blue-50' : 'bg-white'}`}>
                               <div class="text-[11px] font-semibold text-slate-400">{slotLabels[slot]} / {isBackRow ? '後衛' : '前衛'}</div>
