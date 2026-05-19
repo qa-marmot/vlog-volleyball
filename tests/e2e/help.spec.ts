@@ -53,7 +53,10 @@ test.describe('ヘルプページ', () => {
   test('作戦ボードガイドの主要セクションが表示される', async ({ page }) => {
     await page.goto('/help/strategy-board')
     await expect(page.locator('body')).toContainText('1プラン = 1セット')
+    await expect(page.locator('body')).toContainText('R1〜R6の見方')
+    await expect(page.locator('body')).toContainText('ローテ別メモで書くこと')
     await expect(page.locator('body')).toContainText('共有範囲の選び方')
+    await expect(page.locator('body')).toContainText('システム種別の意味')
     await expect(page.locator('body')).toContainText('よくあるミス')
   })
 })

@@ -40,6 +40,33 @@ const shareTypes = [
   ['印刷用', '紙やPDFで配るための表示です。共有リンクからも開けます。'],
   ['要約', 'LINEやSlackで送る短い共有文です。URLと各ローテの要点をまとめます。'],
 ]
+
+const systemTypes = [
+  ['5-1', 'セッター1人で全ローテを組む形です。セッターが前衛でも後衛でも同じ選手がトスを上げます。'],
+  ['6-2', 'セッターを2人置き、後衛のセッターがトスを上げる運用です。前衛側のセッターは攻撃参加しやすくなります。'],
+  ['4-2', 'セッター2人を前衛・後衛の組み合わせで使う基本形です。チームの約束に合わせて使います。'],
+  ['その他', 'チーム独自の呼び方や変則運用の場合に使います。'],
+]
+
+const rotationExplanations = [
+  ['R1', '基準ローテです。作戦ボードで最初に選んだ6人の並びをそのまま表示します。試合開始時に必ずR1から始まるという意味ではありません。'],
+  ['R2', 'R1から時計回りに1つ進んだ配置です。サイドアウト後など、次のローテに進んだ時の攻撃・守備約束を確認します。'],
+  ['R3', 'R1から2つ進んだ配置です。セッターやミドルの前後関係が変わるため、A/B/Cパスで使える攻撃を見直します。'],
+  ['R4', 'R1から3つ進んだ配置です。前衛・後衛の組み合わせが大きく変わるため、サーブ狙いやブロック方針も確認します。'],
+  ['R5', 'R1から4つ進んだ配置です。後衛攻撃、リベロ交代、セッター1本目対応などの注意点を書いておくと便利です。'],
+  ['R6', 'R1から5つ進んだ配置です。次に進むとR1へ戻るため、試合中に一巡した時の確認にも使います。'],
+]
+
+const rotationMemoFields = [
+  ['注目局面', 'そのローテで特に確認したい場面です。レシーブ時、自サーブ時、両方のどれを重視するかを決めます。'],
+  ['重要ポイント', '選手に一番守ってほしい作戦です。例: AパスならMBを優先、S前衛なのでライト側を厚く使う、など。'],
+  ['避けること', 'そのローテで起こしやすいミスや避けたい選択です。例: Cパスで無理にクイックを使わない、リベロにサーブを集めない、など。'],
+  ['要約メモ', '共有や確認時に短く伝える補足です。細かい戦術名より、試合中に読める短い言葉にします。'],
+  ['リベロ交代', '後衛に下がったMBなど、リベロと交代する選手を指定します。リベロはコート上の6人には含めません。'],
+  ['A/B/Cパス攻撃', 'レシーブの返球品質ごとに、1番手から3番手までの攻撃候補を設定します。選手別攻撃パターンとして共有ページにも表示されます。'],
+  ['サーブ狙い', '短め、深め、選手間、リベロ回避など、相手の崩し方を指定します。'],
+  ['ブロック・守備', 'リード、コミット、クロス締め、ライン締めなど、そのローテの守備方針を残します。'],
+]
 ---
 <Base title="ローテーション作戦ボードの使い方">
   <div class="min-h-screen bg-slate-50">
@@ -95,10 +122,58 @@ const shareTypes = [
       </section>
 
       <section class="mt-6 rounded-lg border bg-white p-5">
+        <h2 class="text-lg font-bold text-slate-900">R1〜R6の見方</h2>
+        <p class="mt-2 text-sm leading-7 text-slate-600">
+          Rはローテーションの略です。R1は作戦ボード上の基準配置で、R2からR6はそこから順番に回転した配置です。
+          開始ローテをR3にした場合でも、R1は基準として残り、試合開始時の表示だけがR3になります。
+        </p>
+        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+          {rotationExplanations.map(([title, body]) => (
+            <div class="rounded-md bg-slate-50 p-3">
+              <h3 class="text-sm font-bold text-slate-900">{title}</h3>
+              <p class="mt-1 text-sm leading-6 text-slate-600">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section class="mt-6 rounded-lg border bg-white p-5">
+        <h2 class="text-lg font-bold text-slate-900">ローテ別メモで書くこと</h2>
+        <p class="mt-2 text-sm leading-7 text-slate-600">
+          ローテ別メモは、試合中に選手が短時間で確認するための作戦メモです。
+          「何を狙うか」と「何を避けるか」を先に決め、攻撃・サーブ・守備の細部をあとから足すと整理しやすくなります。
+        </p>
+        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+          {rotationMemoFields.map(([title, body]) => (
+            <div class="rounded-md border p-3">
+              <h3 class="text-sm font-bold text-slate-900">{title}</h3>
+              <p class="mt-1 text-sm leading-6 text-slate-600">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section class="mt-6 rounded-lg border bg-white p-5">
         <h2 class="text-lg font-bold text-slate-900">共有範囲の選び方</h2>
         <div class="mt-3 grid gap-3 sm:grid-cols-2">
           {shareTypes.map(([title, body]) => (
             <div class="rounded-md border p-3">
+              <h3 class="text-sm font-bold text-slate-900">{title}</h3>
+              <p class="mt-1 text-sm leading-6 text-slate-600">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section class="mt-6 rounded-lg border bg-white p-5">
+        <h2 class="text-lg font-bold text-slate-900">システム種別の意味</h2>
+        <p class="mt-2 text-sm leading-7 text-slate-600">
+          5-1や6-2は、セッターを何人使うか、前衛で何人が攻撃に入りやすいかを表す呼び方です。
+          作戦ボードでは警告や表示の補助に使います。
+        </p>
+        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+          {systemTypes.map(([title, body]) => (
+            <div class="rounded-md bg-slate-50 p-3">
               <h3 class="text-sm font-bold text-slate-900">{title}</h3>
               <p class="mt-1 text-sm leading-6 text-slate-600">{body}</p>
             </div>
