@@ -15,11 +15,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npx wrangler pages dev ./dist --port 8788',
+    command: 'npm run preview',
     url: 'http://localhost:8788',
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.CI,
     timeout: 60000,
     stdout: 'ignore',
     stderr: 'pipe',
   },
 })
+

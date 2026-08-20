@@ -5,13 +5,14 @@
   "scripts": {
     "dev": "wrangler pages dev --compatibility-date=2024-09-23 -- astro dev",
     "build": "astro build && node scripts/fix-wrangler.mjs",
-    "preview": "wrangler pages dev ./dist",
+    "preview": "wrangler dev dist/_worker.js --assets dist --port 8788 --local",
     "astro": "astro",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply vlog-volleyball --local",
     "db:migrate:remote": "wrangler d1 migrations apply vlog-volleyball --remote",
     "test": "vitest run",
     "test:watch": "vitest",
+    "pretest:e2e": "npm run build && npm run db:migrate:local",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -57,3 +58,4 @@
     "wrangler": "^4.81.0"
   }
 }
+

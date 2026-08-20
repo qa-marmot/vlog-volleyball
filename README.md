@@ -25,7 +25,7 @@ V-Log はバレーボールの試合をスマートフォンで手軽に記録�
 - **グラデーションのある分析**: ログなしでも基本結果を表示。詳細ログを入力した試合はスタッツ・ローテーション分析・チャートまで提供
 - **オフライン対応**: 体育館の通信環境が悪くても記録が止まらない（Zustand + localStorageで自動保存）
 - **LINE共有**: 試合終了後、ワンタップでLINEに結果を送信
-- **高速なレスポンス**: Cloudflare エッジで動作し、TTFB 30〜60ms を実現
+- **記録を止めない設計**: 入力中の試合状態をローカルに保持し、Cloudflare D1 への同期と組み合わせる
 
 ---
 
@@ -64,8 +64,7 @@ V-Log はバレーボールの試合をスマートフォンで手軽に記録�
 ## 技術スタック
 
 | カテゴリ | 技術 |
-|---|---|
-| フレームワーク | Astro 5 (SSR) + `@astrojs/cloudflare` |
+| フレームワーク | Astro 6 (SSR) + `@astrojs/cloudflare` |
 | API | Hono（Astro catch-all API route） |
 | DB | Cloudflare D1（SQLite エッジDB） |
 | ORM | Drizzle ORM |
@@ -262,3 +261,4 @@ vlog-volleyball/
 ├── wrangler.toml                    # D1 バインディング設定
 └── tsconfig.json
 ```
+

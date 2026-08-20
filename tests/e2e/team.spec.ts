@@ -29,7 +29,7 @@ test.describe('チーム管理', () => {
       await page.click('button[type="submit"]')
       await page.waitForURL(/\/teams\/[^/]+$/)
       // 6文字の招待コードが表示されていること
-      const codeEl = page.locator('.score-number').first()
+      const codeEl = page.getByTestId('invite-code')
       await expect(codeEl).toBeVisible()
       const codeText = await codeEl.textContent()
       expect(codeText?.trim()).toMatch(/^[A-Z2-9]{6}$/)
@@ -39,8 +39,15 @@ test.describe('チーム管理', () => {
       await registerAndLogin(page, testEmail())
       await page.goto('/teams/new')
       await page.fill('#name', 'ダッシュボード確認チーム')
-      await page.click('button[type="submit"]')
-      await page.goto('/dashboard')
+      await Promise.all([
+        page.waitForURL(/\/teams\/[^/]+$/),
+        page.click('button[type="submit"]'),
+      ])
+      await expect(page.locator('header')).toContainText('ダッシュボード確認チーム')
+      await Promise.all([
+        page.waitForURL('**/dashboard'),
+        page.locator('a[href="/dashboard"]').click(),
+      ])
       await expect(page.locator('main')).toContainText('ダッシュボード確認チーム')
     })
   })
@@ -63,7 +70,7 @@ test.describe('チーム管理', () => {
       await page.click('button[type="submit"]')
       await page.waitForURL(/\/teams\/[^/]+$/)
 
-      const codeEl = page.locator('.score-number').first()
+      const codeEl = page.getByTestId('invite-code')
       const inviteCode = (await codeEl.textContent())?.trim() ?? ''
       expect(inviteCode).toMatch(/^[A-Z2-9]{6}$/)
 
@@ -146,3 +153,4 @@ test.describe('チーム管理', () => {
     })
   })
 })
+
