@@ -169,7 +169,7 @@ const positionFull: Record<string, string> = {
           <button id="copy-code-btn" class="btn-secondary text-xs px-3 py-1.5">コピー</button>
         </div>
         <div class="bg-slate-900 rounded px-4 py-3 text-center">
-          <span class="font-mono text-2xl font-bold text-white tracking-widest score-number">{team.inviteCode}</span>
+          <span data-testid="invite-code" class="font-mono text-2xl font-bold text-white tracking-widest score-number">{team.inviteCode}</span>
         </div>
         <p class="text-xs text-slate-400 mt-2">このコードをチームメンバーに共有してください</p>
       </section>
@@ -314,3 +314,4 @@ const positionFull: Record<string, string> = {
     })
   </script>
 </Base>
+

@@ -46,7 +46,7 @@ test.describe('作戦ボード', () => {
 
   test('memberは作戦作成フォームが表示されず閲覧専用になる', async ({ page, browser }) => {
     const { teamId } = await createTeamWithSixPlayers(page)
-    const inviteCode = (await page.locator('.score-number').first().textContent())?.trim() ?? ''
+    const inviteCode = (await page.getByTestId('invite-code').textContent())?.trim() ?? ''
     expect(inviteCode).toMatch(/^[A-Z2-9]{6}$/)
 
     const memberContext = await browser.newContext()
@@ -59,7 +59,7 @@ test.describe('作戦ボード', () => {
 
     await memberPage.goto(`/teams/${teamId}/strategy`)
     await expect(memberPage.locator('#strategy-create-form')).toHaveCount(0)
-    await expect(memberPage.locator('main')).toContainText('閲覧専用')
+    await expect(memberPage.locator('main')).toContainText('owner / editor のみ実行できます')
 
     await memberContext.close()
   })
@@ -76,3 +76,4 @@ test.describe('作戦ボード', () => {
     await expect(page.locator('main')).toContainText('表示: cards')
   })
 })
+
