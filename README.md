@@ -82,7 +82,7 @@ V-Log はバレーボールの試合をスマートフォンで手軽に記録�
 
 | ツール | 推奨バージョン |
 |---|---|
-| Node.js | 20.x 以上 |
+| Node.js | 22.12 以上 |
 | npm | 10.x 以上 |
 | Wrangler CLI | `npm install -g wrangler` |
 
@@ -192,7 +192,7 @@ wrangler pages deploy dist/
 |---|---|
 | ビルドコマンド | `npm run build` |
 | ビルド出力ディレクトリ | `dist/` |
-| Node.js バージョン | 20.x |
+| Node.js バージョン | 22.x |
 
 ### 3. D1 バインディングの設定
 
